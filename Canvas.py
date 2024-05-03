@@ -7,7 +7,7 @@ import pygame.gfxdraw
 import numpy as np
 from numba import njit
 
-from Palette import Palette
+from src.Palette import Palette
 import time
 # import matplotlib.pyplot as plt
 
