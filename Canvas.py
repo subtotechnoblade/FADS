@@ -450,17 +450,9 @@ class Canvas:
             # self.Alpha_blend(self.palette.Get_color(), mask)
             # self.Linear_blend(self.palette.Get_color(), mask)
             if self.palette.Get_Kernel_Type() != "constant":
-                mask = self.Compute_Convolved_Mask(self.brush.Get_Kernel())
+                self.mask = self.Compute_Convolved_Mask(self.brush.Get_Kernel())
             else:
-                mask = self.Compute_Constant_Mask(self.brush.Get_Kernel(), self.brush.strength)
-
-            if self.mask is None:
-                self.mask = mask
-            else:
-                self.mask += mask
-                self.mask[self.mask > 1] = 1
-
-            self.drawn_curve = np.zeros((self.shape[1], self.shape[0]))
+                self.mask = self.Compute_Constant_Mask(self.brush.Get_Kernel(), self.brush.strength)
 
             pygame.surfarray.blit_array(self.image,
                                         self.Scale_image(self.Linear_blend(self.palette.Get_Color(), self.mask)))
