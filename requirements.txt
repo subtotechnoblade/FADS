@@ -1,5 +1,5 @@
-py2exe~=0.13.0.1
 pygame~=2.5.2
 numpy~=1.25.2
 numba~=0.59.1
 splines~=0.3.1
+colour-science~=0.4.4
