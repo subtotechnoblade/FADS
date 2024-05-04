@@ -1,3 +1,4 @@
+import os
 import ctypes
 from collections import deque
 
@@ -14,7 +15,7 @@ from Palette import Palette
 from Linked_List import Linked_List
 import time
 
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 
 # np.set_printoptions(threshold=np.inf)
@@ -283,7 +284,7 @@ class Brush:
 
 
 class Canvas:
-    def __init__(self, screen, start_pos, shape, tile_size=5, brush_radius=10, falloff="linear"):
+    def __init__(self, screen, start_pos, shape, tile_size=5, brush_radius=10, load_path="", falloff="linear"):
         self.screen = screen
         self.shape = shape
         self.tile_size = tile_size
@@ -295,7 +296,14 @@ class Canvas:
         self.drawn_curve = None
         self.image = pygame.Surface(self.pos[2:])
         self.image.fill((255, 255, 255))
-        self.canvas_pixels = np.ones((*shape[::-1], 3), dtype=np.uint8) * 255
+
+        if load_path == "":
+            self.canvas_pixels = np.ones((*shape[::-1], 3), dtype=np.uint8) * 255
+        else:
+            data = np.load(load_path, allow_pickle=True)
+            self.canvas_pixels = data["inputs"]
+            pygame.surfarray.blit_array(self.image,
+                                        self.Scale_image(self.canvas_pixels))
 
         # start of the undo redo function
         self.buffer = Linked_List()
@@ -310,6 +318,10 @@ class Canvas:
         self.mask = None
 
         self.is_drawing = False
+
+    def Save(self, save_path, name, evaluation):
+        np.savez_compressed(f"{save_path}/{name}", inputs=self.canvas_pixels,
+                            outputs=np.array([evaluation], dtype=np.float32))
 
     def Check_Brush_Collision(self):
         return self.brush.cursor.colliderect(self.pos)
@@ -411,7 +423,6 @@ class Canvas:
             self.is_drawing = False
             self.mouse_curve = deque()
 
-
         self.brush.Update(pygame_events, self.tile_size)
 
         if (self.Check_Brush_Collision() and self.is_drawing and
@@ -464,20 +475,36 @@ class Canvas:
 
 
 if __name__ == "__main__":
+
     ctypes.windll.user32.SetProcessDPIAware()
     true_res = (ctypes.windll.user32.GetSystemMetrics(0), ctypes.windll.user32.GetSystemMetrics(1))
-    screen = pygame.display.set_mode((0, 0), pygame.DOUBLEBUF | pygame.HWSURFACE)
+    screen = pygame.display.set_mode((1920, 1080),
+                                     pygame.DOUBLEBUF | pygame.HWSURFACE | pygame.HWACCEL | pygame.FULLSCREEN,
+                                     vsync=1)
     pygame.event.set_allowed([pygame.QUIT, pygame.KEYDOWN, pygame.MOUSEBUTTONUP, pygame.MOUSEBUTTONDOWN])
 
     pygame.display.set_caption("Fine Arts Drawing Simulator")
     clock = pygame.time.Clock()
     pygame.mouse.set_visible(False)
 
+    save_path = "Paintings"
+    os.makedirs(save_path, exist_ok=True)
+
+    name = ""  # specify file name here
+
+    if name == "":
+        load_path = ""
+    else:
+        load_path = f"Paintings/{name}.npz"
+        if not os.path.isfile(load_path):
+            raise FileNotFoundError("Could not find the file with the name given")
+
     canvas = Canvas(screen=screen,
                     start_pos=(100, 400),
                     shape=(120, 210),
                     tile_size=5,
                     brush_radius=10,
+                    load_path=load_path,
                     falloff="linear")
     running = True
     while running:
@@ -488,8 +515,25 @@ if __name__ == "__main__":
         canvas.Update(pygame_events)
 
         canvas.Draw()
+
+        keys = pygame.key.get_pressed()
         for event in pygame_events:
+            if event.type == pygame.KEYDOWN:
+                if keys[pygame.K_LCTRL] and keys[pygame.K_s]:
+                    name = input("Name of file:")
+                    valid = False
+                    while not valid:
+                        try:
+                            evaluation = float(input("Evaluation of your art:"))
+                            if -1 <= evaluation <= 1:
+                                valid = True
+                            else:
+                                print("Evaluation can only be between -1 and 1")
+                        except:
+                            print("BRu U gave some letters ")
+                    canvas.Save(save_path, name, evaluation)
+
             if event.type == pygame.QUIT:
                 running = False
-                break
+                # break
         pygame.display.flip()
