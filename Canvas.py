@@ -7,14 +7,15 @@ import pygame.gfxdraw
 import numpy as np
 from numba import njit
 
-from Palette import Palette
-import time
-# import matplotlib.pyplot as plt
 
 from splines import CatmullRom
 from scipy.signal import oaconvolve
 
+from Palette import Palette
+from Linked_List import Linked_List
+import time
 
+import matplotlib.pyplot as plt
 # np.set_printoptions(threshold=np.inf)
 
 
@@ -88,7 +89,7 @@ class Brush:
         return kernel
 
     @staticmethod
-    # @njit(cache=True, fastmath=True)
+    @njit(cache=True, fastmath=True)
     def Compute_Cos_Kernel(quadrant_length):
         if quadrant_length == 0:
             return np.ones((1, 1), dtype=np.float32)
@@ -195,7 +196,7 @@ class Brush:
                     self.cursor.update(self.mouse_pos[0] - self.radius, self.mouse_pos[1] - self.radius,
                                        2 * self.radius, 2 * self.radius)
                     quadrant_length = int(self.radius / 4)
-                    self.kernel = self.Compute_Kernel(quadrant_length) /  (quadrant_length if quadrant_length > 0 else 1)
+                    self.kernel = self.Compute_Kernel(quadrant_length) / (quadrant_length if quadrant_length > 0 else 1)
 
                     self.kernel *= self.strength
                 if confirm is not None:
@@ -294,6 +295,10 @@ class Canvas:
         self.image.fill((255, 255, 255))
         self.canvas_pixels = np.ones((*shape[::-1], 3), dtype=np.uint8) * 255
 
+        # start of the undo redo function
+        self.buffer = Linked_List()
+        self.buffer.Add(np.array(self.canvas_pixels))
+
         self.mouse_curve = deque()
 
         self.palette = Palette(self.screen, self.pos[:2] - np.array([0, 225]))
@@ -363,11 +368,10 @@ class Canvas:
         return mask
 
     def Update(self, pygame_events):
-        global screen  # remove later
+        keys = pygame.key.get_pressed()
         # mouse_pos
         mouse_pos = pygame.mouse.get_pos()
         mouse_x, mouse_y = mouse_pos
-        # mouse_x, mouse_y = mouse_pos[0] - self.pos[0], mouse_pos[1] - self.pos[1]
         for event in pygame_events:
             if event.type == pygame.MOUSEBUTTONDOWN and not self.is_drawing and not (
                     self.brush.setting_brush_size or self.brush.setting_brush_strength):
@@ -376,7 +380,18 @@ class Canvas:
                         self.pos[3]):
                     self.is_drawing = True
                     self.drawn_curve = np.zeros((self.shape[1], self.shape[0]))
-                break
+
+            if event.type == pygame.KEYDOWN:
+                if keys[pygame.K_LCTRL] and keys[pygame.K_LSHIFT] and keys[pygame.K_z]:
+                    self.buffer.Move_Pointer(1)
+                    self.canvas_pixels = self.buffer.pointer.snapshot
+
+                elif keys[pygame.K_LCTRL] and keys[pygame.K_z]:
+                    self.buffer.Move_Pointer(-1)
+                    self.canvas_pixels = self.buffer.pointer.snapshot
+                pygame.surfarray.blit_array(self.image,
+                                            self.Scale_image(self.canvas_pixels))
+
         self.palette.Update(pygame_events)
 
         if (not pygame.mouse.get_pressed()[0]) and not (
@@ -385,6 +400,10 @@ class Canvas:
                 # If we left go from drawing
                 # We thus appy the colored mask to the self.canvas_pixels
                 self.canvas_pixels = self.Linear_blend(self.palette.Get_Color(), self.mask)
+
+                if not np.allclose(a=self.canvas_pixels, b=self.buffer.pointer.snapshot, rtol=5e-2):
+                    self.buffer.Add(np.array(self.canvas_pixels))
+
                 self.mask = None
             self.is_drawing = False
             self.mouse_curve = deque()
