@@ -7,15 +7,16 @@ import pygame.gfxdraw
 import numpy as np
 from numba import njit
 
-
 from splines import CatmullRom
-from scipy.signal import oaconvolve
+from scipy.signal import oaconvolve, fftconvolve, convolve
 
 from Palette import Palette
 from Linked_List import Linked_List
 import time
 
 import matplotlib.pyplot as plt
+
+
 # np.set_printoptions(threshold=np.inf)
 
 
@@ -207,7 +208,8 @@ class Brush:
 
         if self.current_kernel_type != (palette_kernel_type := self.palette.Get_Kernel_Type()):
             quadrant_length = int(self.radius / 4)
-            self.kernel = (self.Compute_Kernel(quadrant_length) / (quadrant_length if quadrant_length > 0 else 1)) * self.strength
+            self.kernel = (self.Compute_Kernel(quadrant_length) / (
+                quadrant_length if quadrant_length > 0 else 1)) * self.strength
 
             self.current_kernel_type = palette_kernel_type
 
@@ -313,7 +315,8 @@ class Canvas:
         return self.brush.cursor.colliderect(self.pos)
 
     def Scale_image(self, arr):
-        return np.repeat(np.repeat(arr, self.tile_size, axis=0), self.tile_size, axis=1)
+        x = np.repeat(np.repeat(arr, self.tile_size, axis=0), self.tile_size, axis=1)
+        return x
 
     def Linear_blend(self, color: np.array, mask: np.array):
         mask = np.ones((*mask.shape, 3)) * mask[:, :, np.newaxis]
@@ -362,7 +365,8 @@ class Canvas:
         return mask
 
     def Compute_Convolved_Mask(self, kernel):
-        mask = oaconvolve(self.drawn_curve, kernel, "same")
+        t = time.time()
+        mask = fftconvolve(self.drawn_curve, kernel, "same")
         mask[mask <= 1e-4] = 0
         mask[mask > 1] = 1
         return mask
@@ -391,7 +395,6 @@ class Canvas:
                     self.canvas_pixels = self.buffer.pointer.snapshot
                 pygame.surfarray.blit_array(self.image,
                                             self.Scale_image(self.canvas_pixels))
-
         self.palette.Update(pygame_events)
 
         if (not pygame.mouse.get_pressed()[0]) and not (
@@ -407,11 +410,14 @@ class Canvas:
                 self.mask = None
             self.is_drawing = False
             self.mouse_curve = deque()
+
+
         self.brush.Update(pygame_events, self.tile_size)
 
         if (self.Check_Brush_Collision() and self.is_drawing and
                 not (self.brush.setting_brush_size or self.brush.setting_brush_strength)):
             unique_points = len(set(self.mouse_curve))
+
             if unique_points == 4:
                 interpolated_mouse_coords = self.CatMull_Rom_interpolation(np.array(self.mouse_curve), self.tile_size,
                                                                            fully=True)
@@ -420,6 +426,7 @@ class Canvas:
                                                                            fully=False)
             else:
                 interpolated_mouse_coords = np.array(self.mouse_curve)
+
             for x, y in interpolated_mouse_coords:
                 if self.pos[0] <= x + 1 <= self.pos[0] + self.pos[2] and self.pos[1] <= y + 1 <= self.pos[1] + self.pos[
                     3]:
@@ -432,9 +439,17 @@ class Canvas:
             # self.Alpha_blend(self.palette.Get_color(), mask)
             # self.Linear_blend(self.palette.Get_color(), mask)
             if self.palette.Get_Kernel_Type() != "constant":
-                self.mask = self.Compute_Convolved_Mask(self.brush.Get_Kernel())
+                mask = self.Compute_Convolved_Mask(self.brush.Get_Kernel())
             else:
-                self.mask = self.Compute_Constant_Mask(self.brush.Get_Kernel(), self.brush.strength)
+                mask = self.Compute_Constant_Mask(self.brush.Get_Kernel(), self.brush.strength)
+
+            if self.mask is None:
+                self.mask = mask
+            else:
+                self.mask += mask
+                self.mask[self.mask > 1] = 1
+
+            self.drawn_curve = np.zeros((self.shape[1], self.shape[0]))
 
             pygame.surfarray.blit_array(self.image,
                                         self.Scale_image(self.Linear_blend(self.palette.Get_Color(), self.mask)))
@@ -445,13 +460,16 @@ class Canvas:
         self.screen.blit(self.image, self.pos[:2])
         self.palette.Draw()
         self.brush.Draw_brush()
+        # pygame.display.update()
 
 
 if __name__ == "__main__":
     ctypes.windll.user32.SetProcessDPIAware()
     true_res = (ctypes.windll.user32.GetSystemMetrics(0), ctypes.windll.user32.GetSystemMetrics(1))
+    screen = pygame.display.set_mode((0, 0), pygame.DOUBLEBUF | pygame.HWSURFACE)
+    pygame.event.set_allowed([pygame.QUIT, pygame.KEYDOWN, pygame.MOUSEBUTTONUP, pygame.MOUSEBUTTONDOWN])
 
-    screen = pygame.display.set_mode(true_res, pygame.DOUBLEBUF | pygame.HWSURFACE)
+    pygame.display.set_caption("Fine Arts Drawing Simulator")
     clock = pygame.time.Clock()
     pygame.mouse.set_visible(False)
 
@@ -459,17 +477,17 @@ if __name__ == "__main__":
                     start_pos=(100, 400),
                     shape=(120, 210),
                     tile_size=5,
-                    brush_radius=30,
+                    brush_radius=10,
                     falloff="linear")
     running = True
     while running:
-        clock.tick(60)
+        clock.tick(360)
         pygame_events = pygame.event.get()
         screen.fill((153, 207, 224))
 
         canvas.Update(pygame_events)
-        canvas.Draw()
 
+        canvas.Draw()
         for event in pygame_events:
             if event.type == pygame.QUIT:
                 running = False

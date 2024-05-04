@@ -378,12 +378,6 @@ class Palette:
         for smoothing_button in self.smoothing_buttons:
             smoothing_button.Render_Button(hover_color=(0, 255, 127))
 
-
-# DO NOT EDIT
-# DO NOT EDIT
-# DO NOT EDIT
-# DO NOT EDIT
-
 if __name__ == "__main__":
     import time
 
