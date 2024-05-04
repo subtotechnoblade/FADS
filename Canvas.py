@@ -21,14 +21,14 @@ import time
 # np.set_printoptions(threshold=np.inf)
 
 
-@njit(cache=True, fastmath=True)
+@njit(cache=True, nogil=True, fastmath=True)
 def Compute_Circular_Mask(radius):
     size = 2 * radius + 1
     coords = np.arange(size, dtype=np.float32)
     return (coords - radius) ** 2 + (coords.reshape((-1, 1)) - radius) ** 2 <= radius ** 2
 
 
-@njit(cache=True, fastmath=True)
+@njit(cache=True, nogil=True, fastmath=True)
 def Compute_Distance(radius):
     size = 2 * radius + 1
     coords = np.arange(size, dtype=np.float32)
@@ -77,7 +77,7 @@ class Brush:
         return Compute_Circular_Mask(quadrant_length).astype(np.float32, copy=False) * 1
 
     @staticmethod
-    @njit(cache=True, fastmath=True)
+    @njit(cache=True, nogil=True, fastmath=True)
     def Compute_Quadratic_Kernel(quadrant_length):
         if quadrant_length == 0:
             return np.ones((1, 1), dtype=np.float32)
