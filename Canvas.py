@@ -9,18 +9,19 @@ from numba import njit
 
 from Palette import Palette
 import time
-# import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 
 from splines import CatmullRom
 from scipy.signal import oaconvolve
+
 
 # np.set_printoptions(threshold=np.inf)
 
 
 @njit(cache=True, fastmath=True)
-def Compute_Circular_Mask(radius, boundary=0):
+def Compute_Circular_Mask(radius):
     size = 2 * radius + 1
-    coords = np.arange(size)
+    coords = np.arange(size, dtype=np.float32)
     return (coords - radius) ** 2 + (coords.reshape((-1, 1)) - radius) ** 2 <= radius ** 2
 
 
@@ -42,7 +43,7 @@ class Brush:
         self.palette = palette
 
         self.Numba_Warmup()
-        self.strength = 0.3
+        self.strength = 1.0
         self.new_strength = self.strength
         self.strength_font = pygame.font.SysFont("ebrima", 25)
 
@@ -56,7 +57,9 @@ class Brush:
             (self.mouse_pos[0] - self.radius, self.mouse_pos[1] - self.radius, 2 * self.radius, 2 * self.radius))
 
         self.current_kernel_type = self.palette.Get_Kernel_Type()
-        self.kernel = self.Compute_Kernel(int(self.radius / 4))
+
+        quadrant_length = int(self.radius / 4)
+        self.kernel = self.Compute_Kernel(quadrant_length) / quadrant_length
         self.kernel *= self.strength
         self.visual_kernel = None
 
@@ -68,7 +71,7 @@ class Brush:
     def Constant_Kernel(quadrant_length):
         if quadrant_length == 0:
             return np.ones((1, 1), dtype=np.float32)
-        return Compute_Circular_Mask(quadrant_length, boundary=1).astype(np.float32, copy=False) * 1
+        return Compute_Circular_Mask(quadrant_length).astype(np.float32, copy=False) * 1
 
     @staticmethod
     @njit(cache=True, fastmath=True)
@@ -78,21 +81,22 @@ class Brush:
 
         distance_mask = Compute_Distance(quadrant_length) / quadrant_length
 
-        kernel = ((-distance_mask ** 2) + 1) / quadrant_length
+        kernel = ((-distance_mask ** 2) + 1)
         circular_mask = Compute_Circular_Mask(quadrant_length)
         kernel = kernel * circular_mask
+
         return kernel
 
     @staticmethod
-    @njit(cache=True, fastmath=True)
+    # @njit(cache=True, fastmath=True)
     def Compute_Cos_Kernel(quadrant_length):
         if quadrant_length == 0:
-            return np.ones((1, 1), dtype=np.float64)
+            return np.ones((1, 1), dtype=np.float32)
 
         distance_mask = Compute_Distance(quadrant_length) / quadrant_length
-
-        kernel = (0.5 * np.cos(np.pi * distance_mask) + 0.5)
-        kernel /= kernel[quadrant_length][quadrant_length] * quadrant_length
+        # print
+        kernel = (0.5 * np.cos(np.pi * distance_mask) + 0.5).astype(np.float32)
+        kernel /= kernel[quadrant_length][quadrant_length]
         circular_mask = Compute_Circular_Mask(quadrant_length)
         kernel = kernel * circular_mask
         return kernel
@@ -111,15 +115,16 @@ class Brush:
     def Get_Kernel(self):
         return self.kernel
 
-    def Render_Kernel(self, radius, kernel):
+    def Render_Kernel(self, radius, visual_kernel):
         size = radius * 2 + 1
         kernel_surf = pygame.Surface((size, size), pygame.SRCALPHA, 32)
         kernel_surf.fill(self.palette.Get_Color())
         alpha = pygame.surfarray.pixels_alpha(kernel_surf)
-        alpha[:] = kernel
+        alpha[:] = visual_kernel
 
         del alpha
         self.screen.blit(kernel_surf, (self.mouse_pos[0] - radius, self.mouse_pos[1] - radius))
+        del kernel_surf
 
     def Update(self, pygame_events, tile_size):
 
@@ -166,7 +171,8 @@ class Brush:
                     # make a new method that does that based on the current kernel selection
                     # also implement that (current kernel selection)
                     # rad = int(self.radius / 3)
-                    self.kernel = self.Compute_Kernel(int(self.radius / 4))
+                    quadrant_length = int(self.radius / 4)
+                    self.kernel = self.Compute_Kernel(quadrant_length) / quadrant_length
 
                     self.kernel *= self.strength
                 if confirm is not None:
@@ -188,8 +194,8 @@ class Brush:
 
                     self.cursor.update(self.mouse_pos[0] - self.radius, self.mouse_pos[1] - self.radius,
                                        2 * self.radius, 2 * self.radius)
-
-                    self.kernel = self.Compute_Kernel(int(self.radius / 4))
+                    quadrant_length = int(self.radius / 4)
+                    self.kernel = self.Compute_Kernel(quadrant_length) / quadrant_length
 
                     self.kernel *= self.strength
                 if confirm is not None:
@@ -199,7 +205,8 @@ class Brush:
         # Update the kernel
 
         if self.current_kernel_type != (palette_kernel_type := self.palette.Get_Kernel_Type()):
-            self.kernel = self.Compute_Kernel(int(self.radius / 4)) * self.strength
+            quadrant_length = int(self.radius / 4)
+            self.kernel = (self.Compute_Kernel(quadrant_length) / quadrant_length) * self.strength
 
             self.current_kernel_type = palette_kernel_type
 
@@ -226,20 +233,22 @@ class Brush:
                                     self.new_radius,
                                     (0, 0, 0))
             if self.palette.Get_Kernel_Type() != "constant":
-                kernel = self.Compute_Kernel(self.new_radius) * 255 * self.strength
-                kernel *= self.new_radius
+                visual_kernel = self.Compute_Kernel(self.new_radius) * 255 * self.strength
             else:
-                kernel = self.Compute_Kernel(self.new_radius * 1.25) * 255 * self.strength
+                visual_kernel = self.Compute_Kernel(self.new_radius * 1.25) * 255 * self.strength
 
-            self.Render_Kernel(self.new_radius, kernel)
+            self.Render_Kernel(self.new_radius, visual_kernel)
 
         elif self.setting_brush_strength:
-            kernel = self.Compute_Kernel(100 * 1.25) * 255 * self.new_strength
 
             # This is so stupid, I don't know why we mul by 255 and the radius
             if self.palette.Get_Kernel_Type() != "constant":
-                kernel *= 100
+                kernel = self.Compute_Kernel(100) * 255 * self.new_strength
+            else:
+                kernel = self.Compute_Kernel(100 * 1.25) * 255 * self.new_strength
+
             self.Render_Kernel(100, kernel)
+
             pygame.gfxdraw.aacircle(self.screen,
                                     self.mouse_pos[0],
                                     self.mouse_pos[1],
