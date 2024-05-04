@@ -9,7 +9,7 @@ from numba import njit
 
 from Palette import Palette
 import time
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 from splines import CatmullRom
 from scipy.signal import oaconvolve
