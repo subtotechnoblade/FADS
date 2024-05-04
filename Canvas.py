@@ -7,7 +7,7 @@ import pygame.gfxdraw
 import numpy as np
 from numba import njit
 
-from src.Palette import Palette
+from Palette import Palette
 import time
 # import matplotlib.pyplot as plt
 
@@ -234,7 +234,7 @@ class Brush:
             self.Render_Kernel(self.new_radius, kernel)
 
         elif self.setting_brush_strength:
-            kernel = self.Compute_Kernel(100) * 255 * self.new_strength
+            kernel = self.Compute_Kernel(100 * 1.25) * 255 * self.new_strength
 
             # This is so stupid, I don't know why we mul by 255 and the radius
             if self.palette.Get_Kernel_Type() != "constant":
