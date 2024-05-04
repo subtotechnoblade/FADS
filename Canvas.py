@@ -1,5 +1,5 @@
 import os
-import ctypes
+# import ctypes
 from collections import deque
 
 import pygame
@@ -468,8 +468,8 @@ class Canvas:
 
 if __name__ == "__main__":
 
-    ctypes.windll.user32.SetProcessDPIAware()
-    true_res = (ctypes.windll.user32.GetSystemMetrics(0), ctypes.windll.user32.GetSystemMetrics(1))
+    # ctypes.windll.user32.SetProcessDPIAware()
+    # true_res = (ctypes.windll.user32.GetSystemMetrics(0), ctypes.windll.user32.GetSystemMetrics(1))
     screen = pygame.display.set_mode((1920, 1080),
                                      pygame.DOUBLEBUF | pygame.HWSURFACE | pygame.HWACCEL | pygame.FULLSCREEN,
                                      vsync=1)
