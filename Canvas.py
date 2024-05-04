@@ -9,7 +9,7 @@ import numpy as np
 from numba import njit
 
 from splines import CatmullRom
-from scipy.signal import oaconvolve, fftconvolve, convolve
+from scipy.signal import fftconvolve
 
 from Palette import Palette
 from Linked_List import Linked_List
@@ -371,7 +371,7 @@ class Canvas:
         return interpolated_points.astype(np.int16, copy=False)
 
     def Compute_Constant_Mask(self, kernel, strength):
-        mask = oaconvolve(self.drawn_curve, kernel, "same")
+        mask = fftconvolve(self.drawn_curve, kernel, "same")
         mask[mask <= 1e-4] = 0
         mask[mask > 0] = strength
         return mask
