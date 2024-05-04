@@ -170,9 +170,9 @@ class Brush:
                     # In order to change the current kernel, and re compute it
                     # make a new method that does that based on the current kernel selection
                     # also implement that (current kernel selection)
-                    # rad = int(self.radius / 3)
+
                     quadrant_length = int(self.radius / 4)
-                    self.kernel = self.Compute_Kernel(quadrant_length) / quadrant_length
+                    self.kernel = self.Compute_Kernel(quadrant_length) / (quadrant_length if quadrant_length > 0 else 1)
 
                     self.kernel *= self.strength
                 if confirm is not None:
@@ -195,7 +195,7 @@ class Brush:
                     self.cursor.update(self.mouse_pos[0] - self.radius, self.mouse_pos[1] - self.radius,
                                        2 * self.radius, 2 * self.radius)
                     quadrant_length = int(self.radius / 4)
-                    self.kernel = self.Compute_Kernel(quadrant_length) / quadrant_length
+                    self.kernel = self.Compute_Kernel(quadrant_length) /  (quadrant_length if quadrant_length > 0 else 1)
 
                     self.kernel *= self.strength
                 if confirm is not None:
@@ -206,7 +206,7 @@ class Brush:
 
         if self.current_kernel_type != (palette_kernel_type := self.palette.Get_Kernel_Type()):
             quadrant_length = int(self.radius / 4)
-            self.kernel = (self.Compute_Kernel(quadrant_length) / quadrant_length) * self.strength
+            self.kernel = (self.Compute_Kernel(quadrant_length) / (quadrant_length if quadrant_length > 0 else 1)) * self.strength
 
             self.current_kernel_type = palette_kernel_type
 
