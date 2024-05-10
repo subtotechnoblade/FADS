@@ -57,7 +57,7 @@ class Brush:
 
         self.mouse_pos = np.array(pygame.mouse.get_pos(), dtype=np.int16)
         self.prev_mouse_pos = self.mouse_pos
-        self.prev_mouse_press = False
+        self.prev_mouse_press = pygame.mouse.get_pressed()
 
         self.cursor = pygame.Rect(
             (self.mouse_pos[0] - self.radius, self.mouse_pos[1] - self.radius, 2 * self.radius, 2 * self.radius))
@@ -218,7 +218,7 @@ class Brush:
             self.current_kernel_type = palette_kernel_type
 
         self.prev_mouse_pos = np.array(pygame.mouse.get_pos(), dtype=np.int16)
-        self.prev_mouse_press = False
+        self.prev_mouse_press = pygame.mouse.get_pressed()
 
     def Draw_brush(self):
         if not (self.setting_brush_strength or self.setting_brush_size):
@@ -322,8 +322,6 @@ class Canvas:
 
         self.is_drawing = False
 
-        # filling variables
-        self.attempt_fill_color, self.attempt_fill_line = False, False
         self.fill_threshold = 0
 
     def Save(self, save_path, name, evaluation):
@@ -392,12 +390,14 @@ class Canvas:
         is_brush_collided = self.Check_Brush_Collision()
         keys = pygame.key.get_pressed()
         # mouse_pos
+        mouse_down = False
         mouse_pos = pygame.mouse.get_pos()
         mouse_x, mouse_y = mouse_pos
         mouse_pressed = pygame.mouse.get_pressed()[0]
 
         for event in pygame_events:
-
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                mouse_down = True
             if ((event.type == pygame.MOUSEBUTTONDOWN and event.button == 1)
                     and not self.is_drawing and not (
                             self.brush.setting_brush_size or self.brush.setting_brush_strength)):
@@ -408,13 +408,20 @@ class Canvas:
                     self.drawn_curve = np.zeros((self.shape[1], self.shape[0]))
 
             if event.type == pygame.KEYDOWN:
-                if keys[pygame.K_LCTRL] and keys[pygame.K_LSHIFT] and keys[pygame.K_z]:
-                    self.buffer.Move_Pointer(1)
-                    self.canvas_pixels = self.buffer.pointer.snapshot
+                if not keys[pygame.K_LALT]: # make sure you can't accidentally undo along with filling
+                    # at the same time
+                    if keys[pygame.K_LCTRL] and keys[pygame.K_LSHIFT] and keys[pygame.K_z]:
+                        self.buffer.Move_Pointer(1)
+                        self.canvas_pixels = self.buffer.pointer.snapshot
+                        pygame.surfarray.blit_array(self.image,
+                                                    self.Scale_Image(self.canvas_pixels))
 
-                elif keys[pygame.K_LCTRL] and keys[pygame.K_z]:
-                    self.buffer.Move_Pointer(-1)
-                    self.canvas_pixels = self.buffer.pointer.snapshot
+                    elif keys[pygame.K_LCTRL] and keys[pygame.K_z]:
+                        self.buffer.Move_Pointer(-1)
+                        self.canvas_pixels = self.buffer.pointer.snapshot
+                        pygame.surfarray.blit_array(self.image,
+                                                    self.Scale_Image(self.canvas_pixels))
+            if event.type == pygame.KEYUP:
                 pygame.surfarray.blit_array(self.image,
                                             self.Scale_Image(self.canvas_pixels))
         self.palette.Update(pygame_events)
@@ -424,8 +431,7 @@ class Canvas:
         # update when we are not drawing nor selecting brush size/strength
         if (is_brush_collided and
                 not (self.brush.setting_brush_size or self.brush.setting_brush_strength) and
-        keys[pygame.K_LCTRL] or keys[pygame.K_LALT]):
-            self.attempt_fill_color, self.attempt_fill_line = False, False
+                keys[pygame.K_LALT]):
             # attempt to update threshold only when attempting to fill
             for event in pygame_events:
                 if event.type == pygame.MOUSEWHEEL:
@@ -433,32 +439,42 @@ class Canvas:
                         self.fill_threshold += 0.05 * event.y
                     break
 
-            if keys[pygame.K_LCTRL]:
-                mask = Color_Fill(self.canvas_pixels,
-                                               (int((mouse_x - self.pos[0]) / self.tile_size),
-                                                int((mouse_y - self.pos[1]) / self.tile_size)),
-                                               self.palette.Get_Color(),
-                                               threshold=self.fill_threshold)
-                self.unconfirmed_filled_color_image = pygame.Surface(self.pos[2:])
-                if mouse_pressed:
-                    self.canvas_pixels = self.Linear_Blend(self.palette.Get_Color(), mask.astype(np.float32, copy=False) * self.brush.strength)
+            if keys[pygame.K_LALT] and keys[pygame.K_LCTRL]:
+                mask = Line_Fill(self.canvas_pixels,
+                                 (int((mouse_x - self.pos[0]) / self.tile_size),
+                                  int((mouse_y - self.pos[1]) / self.tile_size)),
+                                 threshold=self.fill_threshold)
 
-                pygame.surfarray.blit_array(self.unconfirmed_filled_color_image,
-                                            self.Scale_Image(self.Linear_Blend(self.palette.Get_Color(), mask.astype(np.float32, copy=False) * self.brush.strength)))
-                self.attempt_fill_color = True
-            # elif keys[pygame.K_LALT]:
-            #     mask = Line_Fill(self.canvas_pixels,
-            #                                   (int((mouse_x - self.pos[0]) / self.tile_size),
-            #                                    int((mouse_y - self.pos[1]) / self.tile_size)),
-            #                                   self.palette.Get_Color())
-            #     self.unconfirmed_filled_line_image = pygame.Surface(self.pos[2:])
-            #
-            #     pygame.surfarray.blit_array(self.unconfirmed_filled_line_image, self.Scale_Image(filled_canvas_arr))
-            #     self.attempt_fill_line = True
+                if mouse_pressed and mouse_down:  # if we confirm the fill
+                    self.canvas_pixels = self.Linear_Blend(self.palette.Get_Color(),
+                                                           mask * self.brush.strength)
+                    # add undo step into the buffer
+                    if not np.allclose(a=self.canvas_pixels, b=self.buffer.pointer.snapshot, rtol=5e-2):
+                        self.buffer.Add(np.array(self.canvas_pixels))
+
+                pygame.surfarray.blit_array(self.image, self.Scale_Image(self.Linear_Blend(self.palette.Get_Color(),
+                                                                                           mask * self.brush.strength)))
+
+
+            elif keys[pygame.K_LALT]:
+                mask = Color_Fill(self.canvas_pixels,
+                                  (int((mouse_x - self.pos[0]) / self.tile_size),
+                                   int((mouse_y - self.pos[1]) / self.tile_size)),
+                                  threshold=self.fill_threshold)
+                if mouse_pressed and mouse_down:  # if we confirm the fill
+                    self.canvas_pixels = self.Linear_Blend(self.palette.Get_Color(),
+                                                           mask * self.brush.strength)
+                    # add undo step into the buffer
+                    if not np.allclose(a=self.canvas_pixels, b=self.buffer.pointer.snapshot, rtol=5e-2):
+                        self.buffer.Add(np.array(self.canvas_pixels))
+
+                pygame.surfarray.blit_array(self.image,
+                                            self.Scale_Image(self.Linear_Blend(self.palette.Get_Color(),
+                                                                               mask * self.brush.strength)))
 
         # update if we want to draw thus clicking and dragging
         elif (is_brush_collided and self.is_drawing and
-                not (self.brush.setting_brush_size or self.brush.setting_brush_strength)):
+              not (self.brush.setting_brush_size or self.brush.setting_brush_strength)):
             # put all update drawing code here that doesn't interfere with the brush updates 
             unique_points = len(set(self.mouse_curve))
 
@@ -510,9 +526,6 @@ class Canvas:
     def Draw(self):
         # Canvas drawing code
         self.screen.blit(self.image, self.pos[:2])
-        if self.attempt_fill_color:
-            self.screen.blit(self.unconfirmed_filled_color_image, self.pos[:2])
-
         # ui drawing code
         self.palette.Draw()
         self.brush.Draw_brush()

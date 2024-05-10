@@ -2,7 +2,7 @@ import numpy as np
 from scipy import ndimage
 
 
-def Color_Fill(input_array, start_coords, fill_value, threshold=0):
+def Color_Fill(input_array, start_coords, threshold=0):
     """
     Fills the connected region of start_coords in input_array with fill_value.
     Idea formulated by GPT4 but fully understood and modified to implement threshold
@@ -32,9 +32,10 @@ def Color_Fill(input_array, start_coords, fill_value, threshold=0):
 fill_kernel = np.ones((3, 3), dtype=np.bool_)
 
 
-def Line_Fill(input_array, start_coords, fill_value, threshold=0):
+def Line_Fill(input_array, start_coords, threshold=0):
     """
     Fills the connected region of start_coords in input_array with fill_value.
+    Dectects diagonal pixels while color_fill doesn't
     Idea formulated by GPT4 but fully understood and modified to implement threshold
 
     :param input_array: Numpy array representing the image
@@ -57,9 +58,7 @@ def Line_Fill(input_array, start_coords, fill_value, threshold=0):
     labeled_array, num_features = ndimage.label(mask, fill_kernel)
     feature_index = labeled_array[start_coords]
 
-    # output_array[labeled_array == feature_index] = 1
     return labeled_array == feature_index
-    # return np.sum(output_array
 
 
 if __name__ == "__main__":
