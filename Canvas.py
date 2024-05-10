@@ -1,4 +1,5 @@
 import os
+import sys
 # import ctypes
 from collections import deque
 
@@ -15,7 +16,7 @@ from Palette import Palette
 from Linked_List import Linked_List
 from Filler import Color_Fill, Line_Fill
 
-import time
+# import time
 
 
 # import matplotlib.pyplot as plt
@@ -380,7 +381,6 @@ class Canvas:
         return mask
 
     def Compute_Convolved_Mask(self, kernel):
-        t = time.time()
         mask = fftconvolve(self.drawn_curve, kernel, "same")
         mask[mask <= 1e-4] = 0
         mask[mask > 1] = 1
@@ -595,3 +595,4 @@ if __name__ == "__main__":
                 running = False
                 # break
         pygame.display.flip()
+    sys.exit()
