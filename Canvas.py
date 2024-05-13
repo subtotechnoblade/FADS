@@ -1,5 +1,5 @@
 import os
-import sys
+# import sys
 # import ctypes
 from collections import deque
 
@@ -7,32 +7,38 @@ import pygame
 import pygame.gfxdraw
 
 import numpy as np
-from numba import njit
+# from numba import njit
 
 from splines import CatmullRom
+
+import pyfftw
+from scipy.fft import set_global_backend
 from scipy.signal import fftconvolve
 
 from Palette import Palette
 from Linked_List import Linked_List
 from Filler import Color_Fill, Line_Fill
 
-# import time
-
+import time
 
 # import matplotlib.pyplot as plt
 
 
 # np.set_printoptions(threshold=np.inf)
 
+set_global_backend(pyfftw.interfaces.scipy_fft)
+pyfftw.config.NUM_THREADS = os.cpu_count()
+pyfftw.interfaces.cache.enable()
 
-@njit(cache=True, nogil=True, fastmath=True)
+
+# @njit(cache=True, nogil=True, fastmath=True)
 def Compute_Circular_Mask(radius):
     size = 2 * radius + 1
     coords = np.arange(size, dtype=np.float32)
     return (coords - radius) ** 2 + (coords.reshape((-1, 1)) - radius) ** 2 <= radius ** 2
 
 
-@njit(cache=True, nogil=True, fastmath=True)
+# @njit(cache=True, nogil=True, fastmath=True)
 def Compute_Distance(radius):
     size = 2 * radius + 1
     coords = np.arange(size, dtype=np.float32)
@@ -81,7 +87,7 @@ class Brush:
         return Compute_Circular_Mask(quadrant_length).astype(np.float32, copy=False) * 1
 
     @staticmethod
-    @njit(cache=True, nogil=True, fastmath=True)
+    # @njit(cache=True, nogil=True, fastmath=True)
     def Compute_Quadratic_Kernel(quadrant_length):
         if quadrant_length == 0:
             return np.ones((1, 1), dtype=np.float32)
@@ -95,7 +101,7 @@ class Brush:
         return kernel
 
     @staticmethod
-    @njit(cache=True, fastmath=True)
+    # @njit(cache=True, fastmath=True)
     def Compute_Cos_Kernel(quadrant_length):
         if quadrant_length == 0:
             return np.ones((1, 1), dtype=np.float32)
@@ -129,7 +135,7 @@ class Brush:
         alpha = pygame.surfarray.pixels_alpha(kernel_surf)
         alpha[:] = visual_kernel
 
-        del alpha
+        del alpha # we must use this, or else this won't work
         self.screen.blit(kernel_surf, (self.mouse_pos[0] - radius, self.mouse_pos[1] - radius))
         del kernel_surf
 
@@ -325,6 +331,9 @@ class Canvas:
 
         self.fill_threshold = 0
 
+        # self.t = 0
+        # self.runs = 0
+
     def Save(self, save_path, name, evaluation):
         np.savez_compressed(f"{save_path}/{name}", inputs=self.canvas_pixels,
                             outputs=np.array([evaluation], dtype=np.float32))
@@ -381,7 +390,12 @@ class Canvas:
         return mask
 
     def Compute_Convolved_Mask(self, kernel):
+        # s = time.time()
         mask = fftconvolve(self.drawn_curve, kernel, "same")
+        # self.t += time.time() - s
+        # self.runs += 1
+        # print(self.t / self.runs)
+
         mask[mask <= 1e-4] = 0
         mask[mask > 1] = 1
         return mask
@@ -408,7 +422,7 @@ class Canvas:
                     self.drawn_curve = np.zeros((self.shape[1], self.shape[0]))
 
             if event.type == pygame.KEYDOWN:
-                if not keys[pygame.K_LALT]: # make sure you can't accidentally undo along with filling
+                if not keys[pygame.K_LALT]:  # make sure you can't accidentally undo along with filling
                     # at the same time
                     if keys[pygame.K_LCTRL] and keys[pygame.K_LSHIFT] and keys[pygame.K_z]:
                         self.buffer.Move_Pointer(1)
@@ -561,7 +575,7 @@ if __name__ == "__main__":
                     start_pos=(100, 400),
                     shape=(120, 210),
                     tile_size=5,
-                    brush_radius=10,
+                    brush_radius=50,
                     load_path=load_path,
                     falloff="linear")
     running = True
@@ -595,4 +609,4 @@ if __name__ == "__main__":
                 running = False
                 # break
         pygame.display.flip()
-    sys.exit()
+    # sys.exit()

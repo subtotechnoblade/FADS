@@ -1,7 +1,7 @@
 import numpy as np
 import pygame
 import pygame.gfxdraw
-import colour
+import colorsys
 
 
 class Button:
@@ -80,8 +80,30 @@ class Color_bucket(Button):
                              self.border)
         pygame.draw.rect(self.screen, self.RGB, self.pos)
 
+def HSV_To_RGB(h, s, v):
+    # Written by stackoverflow https://stackoverflow.com/questions/24852345/hsv-to-rgb-color-conversion
+    shape = h.shape
+    i = np.int_(h * 6.)
+    f = h * 6. - i
 
-def Generate_Colour_Wheel(samples=50, value=1.0, clip_circle=True, method='Color'):
+    q = f
+    t = 1. - f
+    i = np.ravel(i)
+    f = np.ravel(f)
+    i %= 6
+
+    t = np.ravel(t)
+    q = np.ravel(q)
+    clist = (1 - np.ravel(s) * np.vstack([np.zeros_like(f), np.ones_like(f), q, t])) * np.ravel(v)
+
+    # 0:v 1:p 2:q 3:t
+    order = np.array([[0, 3, 1], [2, 0, 1], [1, 0, 3], [1, 2, 0], [3, 1, 0], [0, 1, 2]])
+    rgb = clist[order[i], np.arange(np.prod(shape))[:, None]]
+
+    return rgb.reshape(shape + (3,))
+
+
+def Generate_Colour_Wheel(samples=50, value=1.0):
     # Not written by me, taken from stack overflow
     xx, yy = np.meshgrid(
         np.linspace(-1, 1, samples), np.linspace(-1, 1, samples))
@@ -89,14 +111,9 @@ def Generate_Colour_Wheel(samples=50, value=1.0, clip_circle=True, method='Color
     S = np.sqrt(xx ** 2 + yy ** 2)
     H = (np.arctan2(xx, yy) + np.pi) / (np.pi * 2)
 
-    HSV = colour.utilities.tstack([H, S, np.ones(H.shape) * value])
-    RGB = colour.HSV_to_RGB(HSV)
+    HSV = np.array([H, S, np.ones(H.shape) * value])
+    RGB = HSV_To_RGB(*HSV)
 
-    if method.lower() == 'matplotlib':
-        RGB = colour.utilities.orient(RGB, '90 CW')
-    elif method.lower() == 'nuke':
-        RGB = colour.utilities.orient(RGB, 'Flip')
-        RGB = colour.utilities.orient(RGB, '90 CW')
     RGB = np.flipud(RGB)
     return RGB
 
@@ -282,7 +299,6 @@ class Palette:
         # implement the save when the user quits the game
         # self.color_picker.Set_Coord(self.buttons[0].HSLA)
 
-
         self.is_moving = False
         self.prev_mouse_pos = np.array(pygame.mouse.get_pos(), dtype=np.int16)
         self.background_rect = pygame.draw.rect(screen, color=(100, 100, 100),
@@ -377,6 +393,7 @@ class Palette:
         pygame.draw.rect(self.screen, color=(0, 134, 223), rect=self.selected_smoothing_button.border)
         for smoothing_button in self.smoothing_buttons:
             smoothing_button.Render_Button(hover_color=(0, 255, 127))
+
 
 if __name__ == "__main__":
     import time
