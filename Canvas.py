@@ -578,7 +578,7 @@ if __name__ == "__main__":
                     start_pos=(100, 400),
                     shape=(120, 210),
                     tile_size=5,
-                    brush_radius=50,
+                    brush_radius=20,
                     load_path=load_path,
                     falloff="linear")
     running = True
