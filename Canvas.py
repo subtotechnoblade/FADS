@@ -1,6 +1,6 @@
 import os
-# import sys
-# import ctypes
+import sys
+import ctypes
 from collections import deque
 
 import pygame
@@ -12,6 +12,7 @@ import numpy as np
 from splines import CatmullRom
 
 import pyfftw
+import scipy.fftpack
 from scipy.fft import set_global_backend
 from scipy.signal import fftconvolve
 
@@ -19,13 +20,13 @@ from Palette import Palette
 from Linked_List import Linked_List
 from Filler import Color_Fill, Line_Fill
 
-import time
+# import time
 
 # import matplotlib.pyplot as plt
 
 
 # np.set_printoptions(threshold=np.inf)
-
+scipy.fftpack = pyfftw.interfaces.scipy_fftpack
 set_global_backend(pyfftw.interfaces.scipy_fft)
 pyfftw.config.NUM_THREADS = os.cpu_count()
 pyfftw.interfaces.cache.enable()
@@ -135,7 +136,7 @@ class Brush:
         alpha = pygame.surfarray.pixels_alpha(kernel_surf)
         alpha[:] = visual_kernel
 
-        del alpha # we must use this, or else this won't work
+        del alpha  # we must use this, or else this won't work
         self.screen.blit(kernel_surf, (self.mouse_pos[0] - radius, self.mouse_pos[1] - radius))
         del kernel_surf
 
@@ -331,12 +332,16 @@ class Canvas:
 
         self.fill_threshold = 0
 
-        # self.t = 0
-        # self.runs = 0
 
     def Save(self, save_path, name, evaluation):
         np.savez_compressed(f"{save_path}/{name}", inputs=self.canvas_pixels,
                             outputs=np.array([evaluation], dtype=np.float32))
+
+    def Load(self, load_path):
+        data = np.load(load_path, allow_pickle=True)
+        self.canvas_pixels = data["inputs"]
+        print(f"Loaded: {load_path}")
+        print(f"Evaluation for this piece is {data['outputs']}")
 
     def Check_Brush_Collision(self):
         return self.brush.cursor.colliderect(self.pos)
@@ -356,8 +361,8 @@ class Canvas:
     def Gamma_corrected_multiply(self, color: np.array, mask: np.array):
         painted_color = mask * color
 
-        linear_canvas = ((self.canvas_pixels / 255) ** (2.2)) * 255
-        linear_color = ((painted_color / 255) ** (0.5)) * 255
+        linear_canvas = ((self.canvas_pixels / 255) ** 2.2) * 255
+        linear_color = ((painted_color / 255) ** 0.5) * 255
 
         linear_result = (((1 - mask) * self.canvas_pixels) + (mask * linear_color))
         result = linear_result.clip(0, 255)
@@ -370,8 +375,8 @@ class Canvas:
         else:
             p0, _, _, p1 = mouse_curve[-4:]
 
-        Δx, Δy = p1[0] - p0[0], p1[1] - p0[1]
-        x_increments = int(((Δx ** 2 + Δy ** 2) ** 0.5))
+        delta_x, delta_y = p1[0] - p0[0], p1[1] - p0[1]
+        x_increments = int(((delta_x ** 2 + delta_y ** 2) ** 0.5))
         x_increments = x_increments if x_increments > 1 else 1
 
         inter = CatmullRom(mouse_curve[-4:], alpha=0.65)
@@ -390,11 +395,7 @@ class Canvas:
         return mask
 
     def Compute_Convolved_Mask(self, kernel):
-        # s = time.time()
         mask = fftconvolve(self.drawn_curve, kernel, "same")
-        # self.t += time.time() - s
-        # self.runs += 1
-        # print(self.t / self.runs)
 
         mask[mask <= 1e-4] = 0
         mask[mask > 1] = 1
@@ -443,7 +444,8 @@ class Canvas:
         self.brush.Update(pygame_events, self.tile_size)
 
         # update when we are not drawing nor selecting brush size/strength
-        if (is_brush_collided and
+        if ((self.pos[0] <= mouse_x <= self.pos[0] + self.pos[2] - self.tile_size and self.pos[1] <= mouse_y <=
+             self.pos[1] + self.pos[3] - self.tile_size) and
                 not (self.brush.setting_brush_size or self.brush.setting_brush_strength) and
                 keys[pygame.K_LALT]):
             # attempt to update threshold only when attempting to fill
@@ -547,12 +549,13 @@ class Canvas:
 
 
 if __name__ == "__main__":
-
-    # ctypes.windll.user32.SetProcessDPIAware()
-    # true_res = (ctypes.windll.user32.GetSystemMetrics(0), ctypes.windll.user32.GetSystemMetrics(1))
-    screen = pygame.display.set_mode((1920, 1080),
-                                     pygame.DOUBLEBUF | pygame.HWSURFACE | pygame.HWACCEL | pygame.FULLSCREEN,
+    os.environ["SDL_VIDEO_CENTERED"] = "1"
+    ctypes.windll.user32.SetProcessDPIAware()
+    true_res = (ctypes.windll.user32.GetSystemMetrics(0), ctypes.windll.user32.GetSystemMetrics(1) - 50)
+    screen = pygame.display.set_mode(true_res,
+                                     pygame.DOUBLEBUF | pygame.HWSURFACE | pygame.HWACCEL | pygame.RESIZABLE,
                                      vsync=1)
+
     # pygame.event.set_allowed([pygame.QUIT, pygame.KEYDOWN, pygame.MOUSEBUTTONUP, pygame.MOUSEBUTTONDOWN])
 
     pygame.display.set_caption("Fine Arts Drawing Simulator")
@@ -604,9 +607,20 @@ if __name__ == "__main__":
                         except:
                             print("BRu U gave some letters ")
                     canvas.Save(save_path, name, evaluation)
+                elif keys[pygame.K_LCTRL] and keys[pygame.K_l]:
+                    valid = False
+                    while not valid:
+                        name = input("Load file name:")
+                        if os.path.exists(f"Paintings/{name}.npz"):
+                            valid = True
+                        else:
+                            print("Name not found in paintings")
+                    canvas.Load(f"Paintings/{name}.npz")
+                    print()
 
             if event.type == pygame.QUIT:
                 running = False
                 # break
         pygame.display.flip()
     # sys.exit()
+    pygame.quit()
