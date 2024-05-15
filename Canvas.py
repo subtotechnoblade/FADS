@@ -7,7 +7,7 @@ import pygame
 import pygame.gfxdraw
 
 import numpy as np
-# from numba import njit
+from numba import njit
 
 from splines import CatmullRom
 
@@ -22,7 +22,7 @@ from Filler import Color_Fill, Line_Fill
 
 # import time
 
-# import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 
 
 # np.set_printoptions(threshold=np.inf)
@@ -32,14 +32,14 @@ pyfftw.config.NUM_THREADS = os.cpu_count()
 pyfftw.interfaces.cache.enable()
 
 
-# @njit(cache=True, nogil=True, fastmath=True)
+@njit(cache=True, nogil=True, fastmath=True)
 def Compute_Circular_Mask(radius):
     size = 2 * radius + 1
     coords = np.arange(size, dtype=np.float32)
     return (coords - radius) ** 2 + (coords.reshape((-1, 1)) - radius) ** 2 <= radius ** 2
 
 
-# @njit(cache=True, nogil=True, fastmath=True)
+@njit(cache=True, nogil=True, fastmath=True)
 def Compute_Distance(radius):
     size = 2 * radius + 1
     coords = np.arange(size, dtype=np.float32)
@@ -88,7 +88,7 @@ class Brush:
         return Compute_Circular_Mask(quadrant_length).astype(np.float32, copy=False) * 1
 
     @staticmethod
-    # @njit(cache=True, nogil=True, fastmath=True)
+    @njit(cache=True, nogil=True, fastmath=True)
     def Compute_Quadratic_Kernel(quadrant_length):
         if quadrant_length == 0:
             return np.ones((1, 1), dtype=np.float32)
@@ -102,7 +102,7 @@ class Brush:
         return kernel
 
     @staticmethod
-    # @njit(cache=True, fastmath=True)
+    @njit(cache=True, fastmath=True)
     def Compute_Cos_Kernel(quadrant_length):
         if quadrant_length == 0:
             return np.ones((1, 1), dtype=np.float32)
@@ -309,10 +309,10 @@ class Canvas:
         self.image.fill((255, 255, 255))
 
         if load_path == "":
-            self.canvas_pixels = np.ones((*shape[::-1], 3), dtype=np.uint8) * 255
+            self.canvas_pixels = np.ones((*shape[::-1], 3), dtype=np.float32) * 255.0
         else:
             data = np.load(load_path, allow_pickle=True)
-            self.canvas_pixels = data["inputs"]
+            self.canvas_pixels = data["inputs"].astype(np.float32)
             pygame.surfarray.blit_array(self.image,
                                         self.Scale_Image(self.canvas_pixels))
 
@@ -347,16 +347,16 @@ class Canvas:
         return self.brush.cursor.colliderect(self.pos)
 
     def Scale_Image(self, arr):
-        x = np.repeat(np.repeat(arr, self.tile_size, axis=0), self.tile_size, axis=1)
-        return x
+        return np.repeat(np.repeat(arr, self.tile_size, axis=0), self.tile_size, axis=1)
 
     def Linear_Blend(self, color: np.array, mask: np.array):
-        mask = np.ones((*mask.shape, 3)) * mask[:, :, np.newaxis]
-        return self.canvas_pixels * (1 - mask) + (color * mask)
+        mask = np.ones((*mask.shape, 3), dtype=np.float32) * mask[:, :, np.newaxis]
+        return np.around(self.canvas_pixels * (1 - mask) + (color * mask), decimals=5)
 
     def Alpha_blend(self, color: np.array, mask: np.array):
         # self.canvas_pixels = self.canvas_pixels * (1 - mask) + color * mask
-        return (self.canvas_pixels + (color * mask)) / (1 + mask)
+        mask = np.ones((*mask.shape, 3)) * mask[:, :, np.newaxis]
+        return np.around((self.canvas_pixels + (color * mask)) / (1 + mask), decimals=5)
 
     def Gamma_corrected_multiply(self, color: np.array, mask: np.array):
         painted_color = mask * color
@@ -392,13 +392,15 @@ class Canvas:
         mask = fftconvolve(self.drawn_curve, kernel, "same")
         mask[mask <= 1e-4] = 0
         mask[mask > 0] = strength
+
         return mask
 
     def Compute_Convolved_Mask(self, kernel):
         mask = fftconvolve(self.drawn_curve, kernel, "same")
-
+        print(mask.dtype)
         mask[mask <= 1e-4] = 0
         mask[mask > 1] = 1
+
         return mask
 
     def Update(self, pygame_events):

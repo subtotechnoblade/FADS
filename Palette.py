@@ -1,7 +1,6 @@
 import numpy as np
 import pygame
 import pygame.gfxdraw
-import colorsys
 
 
 class Button:
@@ -61,7 +60,7 @@ class Color_bucket(Button):
     def __init__(self, pos: np.array,
                  screen,
                  color_pin,
-                 color: np.array = np.array([255, 255, 255], dtype=np.uint8)):
+                 color: np.array = np.array([255, 255, 255], dtype=np.float32)):
         super().__init__(pos, screen)
         self.RGB = color
         self.color_pin = color_pin
@@ -79,6 +78,7 @@ class Color_bucket(Button):
                              hover_color,
                              self.border)
         pygame.draw.rect(self.screen, self.RGB, self.pos)
+
 
 def HSV_To_RGB(h, s, v):
     # Written by stackoverflow https://stackoverflow.com/questions/24852345/hsv-to-rgb-color-conversion
@@ -106,13 +106,16 @@ def HSV_To_RGB(h, s, v):
 def Generate_Colour_Wheel(samples=50, value=1.0):
     # Not written by me, taken from stack overflow
     xx, yy = np.meshgrid(
-        np.linspace(-1, 1, samples), np.linspace(-1, 1, samples))
+        np.linspace(-1, 1, samples, dtype=np.float32), np.linspace(-1, 1, samples, dtype=np.float32))
 
     S = np.sqrt(xx ** 2 + yy ** 2)
     H = (np.arctan2(xx, yy) + np.pi) / (np.pi * 2)
 
-    HSV = np.array([H, S, np.ones(H.shape) * value])
+    HSV = np.array([H, S, np.ones(H.shape) * value], dtype=np.float32)
+    # HSV = colour.utilities.tstack(HSV)
+    # print(HSV.shape)
     RGB = HSV_To_RGB(*HSV)
+    # RGB = colour.HSV_to_RGB(HSV)
 
     RGB = np.flipud(RGB)
     return RGB
@@ -128,12 +131,11 @@ class Color_Wheel:
         self.screen = screen
 
         self.color_wheel = np.transpose(Generate_Colour_Wheel(self.size, value=1),
-                                        axes=(1, 0, 2)) * self.Create_Circular_Mask(True) * 255
-
+                                        axes=(1, 0, 2)) * self.Create_Circular_Mask(True) * 255.0
         self.is_pressed = False
         self.color_pin = np.array([self.radius + 1, self.radius + 1, 1.0], dtype=np.float32)
 
-        self.slider_array = np.tile(np.arange(1, 0, -1 / 150), reps=(10, 1)) * 255
+        self.slider_array = np.tile(np.arange(1, 0, -1 / 150), reps=(10, 1)) * 255.0
         self.slider_array = np.ones(3) * self.slider_array[:, :, np.newaxis]
 
     def Create_Circular_Mask(self, full=False):
@@ -145,7 +147,7 @@ class Color_Wheel:
 
     def Update_Color_Wheel(self):
         self.color_wheel = np.transpose(Generate_Colour_Wheel(self.size, value=self.color_pin[2]),
-                                        axes=(1, 0, 2)) * self.Create_Circular_Mask(True) * 255
+                                        axes=(1, 0, 2)) * self.Create_Circular_Mask(True) * 255.0
 
     def Update_Pos(self, dx, dy):
         self.pos[0] += dx
@@ -187,8 +189,7 @@ class Color_Wheel:
             self.is_pressed = False
 
     def Get_Color(self):
-        # since the color wheel is inverted because of array blit
-        return self.color_wheel[int(self.color_pin[0])][int(self.color_pin[1])]
+        return self.color_wheel[int(self.color_pin[0]) - 1][int(self.color_pin[1]) - 1]
 
     def Get_Color_Pin(self):
         return self.color_pin
@@ -262,7 +263,8 @@ class Palette:
                  button_size],
                 dtype=np.int16),
                 screen=self.screen,
-                color_pin=np.array([76, 76, 1.0]))
+                color_pin=np.array([75, 75, 1.0]),
+                color=np.array(self.color_wheel.color_wheel[75][75]))
 
             self.buttons.append(button)
 
@@ -272,7 +274,8 @@ class Palette:
                                                 button_size],
                                                dtype=np.int16),
                                   screen=self.screen,
-                                  color_pin=np.array([76, 76, 1.0]))
+                                  color_pin=np.array([75, 75, 1.0]),
+                                  color=np.array(self.color_wheel.color_wheel[75][75]))
             self.buttons.append(button)
 
         self.selected_button = self.buttons[0]

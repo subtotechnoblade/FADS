@@ -20,7 +20,7 @@ def Color_Fill(input_array, start_coords, threshold=0):
     target_value = output_array[start_coords]
 
     # Create a mask where the target_value is located
-    loss = np.sum(np.abs(output_array - target_value), axis=-1) / (255 * 3)
+    loss = np.sum(np.abs(output_array - target_value), axis=-1) / (255.0 * 3)
     mask = loss <= threshold
 
     # Use binary_fill_holes if necessary or another algorithm like ndimage.label
