@@ -481,7 +481,7 @@ class Canvas:
                                                                                            mask * self.brush.strength)))
 
             # check for color fill
-            elif keys[pygame.f]:
+            elif keys[pygame.K_f]:
                 mask = Color_Fill(self.canvas_pixels,
                                   (int((mouse_x - self.pos[0]) / self.tile_size),
                                    int((mouse_y - self.pos[1]) / self.tile_size)),
