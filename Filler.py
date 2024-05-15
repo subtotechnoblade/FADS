@@ -76,10 +76,4 @@ if __name__ == "__main__":
         x = Line_Fill(arr, (0, 0), np.array([2, 2, 2]))
     print(time.time() - s)
     print(np.sum(x, axis=-1))
-    # print(arr)
-    # s = time.time()
-    # print(color_fill((5, 5), arr, ))
-    # print(time.time() - s)
-    # for x, y in color_fill((5, 5), arr, ):
-    #     arr[y][x] = 2
-    # print(arr)
+

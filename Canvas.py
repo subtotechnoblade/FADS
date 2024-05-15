@@ -7,7 +7,7 @@ import pygame
 import pygame.gfxdraw
 
 import numpy as np
-from numba import njit
+# from numba import njit
 
 from splines import CatmullRom
 
@@ -24,7 +24,6 @@ from Filler import Color_Fill, Line_Fill
 
 import matplotlib.pyplot as plt
 
-
 # np.set_printoptions(threshold=np.inf)
 scipy.fftpack = pyfftw.interfaces.scipy_fftpack
 set_global_backend(pyfftw.interfaces.scipy_fft)
@@ -32,14 +31,14 @@ pyfftw.config.NUM_THREADS = os.cpu_count()
 pyfftw.interfaces.cache.enable()
 
 
-@njit(cache=True, nogil=True, fastmath=True)
+# @njit(cache=True, nogil=True, fastmath=True)
 def Compute_Circular_Mask(radius):
     size = 2 * radius + 1
     coords = np.arange(size, dtype=np.float32)
     return (coords - radius) ** 2 + (coords.reshape((-1, 1)) - radius) ** 2 <= radius ** 2
 
 
-@njit(cache=True, nogil=True, fastmath=True)
+# @njit(cache=True, nogil=True, fastmath=True)
 def Compute_Distance(radius):
     size = 2 * radius + 1
     coords = np.arange(size, dtype=np.float32)
@@ -78,17 +77,25 @@ class Brush:
         self.visual_kernel = None
 
     def Numba_Warmup(self):
+        self.Compute_Constant_Kernel(self.radius)
+        self.Compute_Linear_Kernel(self.radius)
         self.Compute_Quadratic_Kernel(self.radius)
         self.Compute_Cos_Kernel(self.radius)
 
     @staticmethod
-    def Constant_Kernel(quadrant_length):
+    def Compute_Constant_Kernel(quadrant_length):
         if quadrant_length == 0:
             return np.ones((1, 1), dtype=np.float32)
         return Compute_Circular_Mask(quadrant_length).astype(np.float32, copy=False) * 1
 
     @staticmethod
-    @njit(cache=True, nogil=True, fastmath=True)
+    def Compute_Linear_Kernel(quadrant_length):
+        distance = 1 - (Compute_Distance(quadrant_length) / quadrant_length)
+        distance *= Compute_Circular_Mask(quadrant_length)
+        return distance
+
+    @staticmethod
+    # @njit(cache=True, nogil=True, fastmath=True)
     def Compute_Quadratic_Kernel(quadrant_length):
         if quadrant_length == 0:
             return np.ones((1, 1), dtype=np.float32)
@@ -96,13 +103,11 @@ class Brush:
         distance_mask = Compute_Distance(quadrant_length) / quadrant_length
 
         kernel = ((-distance_mask ** 2) + 1)
-        circular_mask = Compute_Circular_Mask(quadrant_length)
-        kernel = kernel * circular_mask
-
+        kernel *= Compute_Circular_Mask(quadrant_length)
         return kernel
 
     @staticmethod
-    @njit(cache=True, fastmath=True)
+    # @njit(cache=True, fastmath=True)
     def Compute_Cos_Kernel(quadrant_length):
         if quadrant_length == 0:
             return np.ones((1, 1), dtype=np.float32)
@@ -111,20 +116,24 @@ class Brush:
         # print
         kernel = (0.5 * np.cos(np.pi * distance_mask) + 0.5).astype(np.float32)
         kernel /= kernel[quadrant_length][quadrant_length]
-        circular_mask = Compute_Circular_Mask(quadrant_length)
-        kernel = kernel * circular_mask
+        kernel *= Compute_Circular_Mask(quadrant_length)  # Mask out the necessary pixels to 0
+
         return kernel
 
     def Compute_Kernel(self, quadrant_length):
-        # print(self.palette.Get_Kernel_Type(), quadrant_length)
+        # print(self.palette.Get_Kernel_Type(), quadrant_length)\
+
         if "cos" == self.palette.Get_Kernel_Type():
             return self.Compute_Cos_Kernel(quadrant_length)
+
+        if "linear" == self.palette.Get_Kernel_Type():
+            return self.Compute_Linear_Kernel(quadrant_length)
 
         if "quadratic" == self.palette.Get_Kernel_Type():
             return self.Compute_Quadratic_Kernel(quadrant_length)
 
         if "constant" == self.palette.Get_Kernel_Type():
-            return self.Constant_Kernel(quadrant_length * 0.8)
+            return self.Compute_Constant_Kernel(quadrant_length * 0.8)
 
     def Get_Kernel(self):
         return self.kernel
@@ -140,14 +149,11 @@ class Brush:
         self.screen.blit(kernel_surf, (self.mouse_pos[0] - radius, self.mouse_pos[1] - radius))
         del kernel_surf
 
-    def Update(self, pygame_events, tile_size):
-
-        keys = pygame.key.get_pressed()
-
-        if (keys[pygame.K_f] and keys[
+    def Update(self, keys, pygame_events, tile_size):
+        if (keys[pygame.K_r] and keys[
             pygame.K_LSHIFT]) and not self.setting_brush_strength and not self.setting_brush_size:
             self.setting_brush_strength = True
-        elif keys[pygame.K_f] and not self.setting_brush_strength and not self.setting_brush_size:
+        elif keys[pygame.K_r] and not self.setting_brush_strength and not self.setting_brush_size:
             self.setting_brush_size = True
 
         # If we are not setting size or strength
@@ -332,7 +338,6 @@ class Canvas:
 
         self.fill_threshold = 0
 
-
     def Save(self, save_path, name, evaluation):
         np.savez_compressed(f"{save_path}/{name}", inputs=self.canvas_pixels,
                             outputs=np.array([evaluation], dtype=np.float32))
@@ -397,13 +402,13 @@ class Canvas:
 
     def Compute_Convolved_Mask(self, kernel):
         mask = fftconvolve(self.drawn_curve, kernel, "same")
-        print(mask.dtype)
         mask[mask <= 1e-4] = 0
         mask[mask > 1] = 1
 
         return mask
 
     def Update(self, pygame_events):
+        self.pygame_events = pygame_events
         is_brush_collided = self.Check_Brush_Collision()
         keys = pygame.key.get_pressed()
         # mouse_pos
@@ -425,31 +430,32 @@ class Canvas:
                     self.drawn_curve = np.zeros((self.shape[1], self.shape[0]))
 
             if event.type == pygame.KEYDOWN:
-                if not keys[pygame.K_LALT]:  # make sure you can't accidentally undo along with filling
-                    # at the same time
-                    if keys[pygame.K_LCTRL] and keys[pygame.K_LSHIFT] and keys[pygame.K_z]:
-                        self.buffer.Move_Pointer(1)
-                        self.canvas_pixels = self.buffer.pointer.snapshot
-                        pygame.surfarray.blit_array(self.image,
-                                                    self.Scale_Image(self.canvas_pixels))
+                if keys[pygame.K_LCTRL] and keys[pygame.K_LSHIFT] and keys[pygame.K_z]:
+                    self.buffer.Move_Pointer(1)
+                    self.canvas_pixels = self.buffer.pointer.snapshot
+                    pygame.surfarray.blit_array(self.image,
+                                                self.Scale_Image(self.canvas_pixels))
 
-                    elif keys[pygame.K_LCTRL] and keys[pygame.K_z]:
-                        self.buffer.Move_Pointer(-1)
-                        self.canvas_pixels = self.buffer.pointer.snapshot
-                        pygame.surfarray.blit_array(self.image,
-                                                    self.Scale_Image(self.canvas_pixels))
+                elif keys[pygame.K_LCTRL] and keys[pygame.K_z]:
+                    self.buffer.Move_Pointer(-1)
+                    self.canvas_pixels = self.buffer.pointer.snapshot
+                    pygame.surfarray.blit_array(self.image,
+                                                self.Scale_Image(self.canvas_pixels))
             if event.type == pygame.KEYUP:
                 pygame.surfarray.blit_array(self.image,
                                             self.Scale_Image(self.canvas_pixels))
-        self.palette.Update(pygame_events)
 
-        self.brush.Update(pygame_events, self.tile_size)
+        # must be before brush update
+        self.palette.Update(mouse_x, mouse_y, mouse_pressed, pygame_events)
+        if self.palette.is_selected_color_picker:
+            return
 
+        self.brush.Update(keys, pygame_events, self.tile_size)
         # update when we are not drawing nor selecting brush size/strength
         if ((self.pos[0] <= mouse_x <= self.pos[0] + self.pos[2] - self.tile_size and self.pos[1] <= mouse_y <=
              self.pos[1] + self.pos[3] - self.tile_size) and
                 not (self.brush.setting_brush_size or self.brush.setting_brush_strength) and
-                keys[pygame.K_LALT]):
+                keys[pygame.K_f]):
             # attempt to update threshold only when attempting to fill
             for event in pygame_events:
                 if event.type == pygame.MOUSEWHEEL:
@@ -457,7 +463,8 @@ class Canvas:
                         self.fill_threshold += 0.05 * event.y
                     break
 
-            if keys[pygame.K_LALT] and keys[pygame.K_LCTRL]:
+            # check for line fill first
+            if keys[pygame.K_f] and keys[pygame.K_LCTRL]:
                 mask = Line_Fill(self.canvas_pixels,
                                  (int((mouse_x - self.pos[0]) / self.tile_size),
                                   int((mouse_y - self.pos[1]) / self.tile_size)),
@@ -473,8 +480,8 @@ class Canvas:
                 pygame.surfarray.blit_array(self.image, self.Scale_Image(self.Linear_Blend(self.palette.Get_Color(),
                                                                                            mask * self.brush.strength)))
 
-
-            elif keys[pygame.K_LALT]:
+            # check for color fill
+            elif keys[pygame.f]:
                 mask = Color_Fill(self.canvas_pixels,
                                   (int((mouse_x - self.pos[0]) / self.tile_size),
                                    int((mouse_y - self.pos[1]) / self.tile_size)),
@@ -482,7 +489,7 @@ class Canvas:
                 if mouse_pressed and mouse_down:  # if we confirm the fill
                     self.canvas_pixels = self.Linear_Blend(self.palette.Get_Color(),
                                                            mask * self.brush.strength)
-                    # add undo step into the buffer
+                    # add an undo step into the buffer
                     if not np.allclose(a=self.canvas_pixels, b=self.buffer.pointer.snapshot, rtol=5e-2):
                         self.buffer.Add(np.array(self.canvas_pixels))
 
@@ -546,8 +553,16 @@ class Canvas:
         self.screen.blit(self.image, self.pos[:2])
         # ui drawing code
         self.palette.Draw()
-        self.brush.Draw_brush()
-        # pygame.display.update()
+
+        self.palette.Update_After_Render(self.pygame_events)  # Unconventional but must be used
+
+        if not self.palette.is_selected_color_picker:
+            self.brush.Draw_brush()
+        else:
+            mouse_x, mouse_y = pygame.mouse.get_pos()
+
+            # Todo change this to the color picker icon
+            pygame.draw.rect(self.screen, (0, 0, 0), (mouse_x, mouse_y, 10, 10), width=5)
 
 
 if __name__ == "__main__":
@@ -585,7 +600,7 @@ if __name__ == "__main__":
                     falloff="linear")
     running = True
     while running:
-        clock.tick(360)
+        clock.tick(60)
         pygame_events = pygame.event.get()
         screen.fill((153, 207, 224))
 
