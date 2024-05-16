@@ -1,4 +1,4 @@
-pygame~=2.5.2
+pygame-ce~=2.4.1
 numpy~=1.25.2
 numba~=0.59.1
 splines~=0.3.1

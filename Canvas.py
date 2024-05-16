@@ -7,7 +7,7 @@ import pygame
 import pygame.gfxdraw
 
 import numpy as np
-from numba import njit
+# from numba import njit
 
 from splines import CatmullRom
 
@@ -20,21 +20,20 @@ from Palette import Palette
 from Linked_List import Linked_List
 from Filler import Color_Fill, Line_Fill
 
-# np.set_printoptions(threshold=np.inf)
 scipy.fftpack = pyfftw.interfaces.scipy_fftpack
 set_global_backend(pyfftw.interfaces.scipy_fft)
 pyfftw.config.NUM_THREADS = os.cpu_count()
 pyfftw.interfaces.cache.enable()
 
 
-@njit(cache=True, nogil=True, fastmath=True)
+# @njit(cache=True, nogil=True, fastmath=True)
 def Compute_Circular_Mask(radius):
     size = 2 * radius + 1
     coords = np.arange(size, dtype=np.float32)
     return (coords - radius) ** 2 + (coords.reshape((-1, 1)) - radius) ** 2 <= radius ** 2
 
 
-@njit(cache=True, nogil=True, fastmath=True)
+# @njit(cache=True, nogil=True, fastmath=True)
 def Compute_Distance(radius):
     size = 2 * radius + 1
     coords = np.arange(size, dtype=np.float32)
@@ -91,7 +90,7 @@ class Brush:
         return distance
 
     @staticmethod
-    @njit(cache=True, nogil=True, fastmath=True)
+    # @njit(cache=True, nogil=True, fastmath=True)
     def Compute_Quadratic_Kernel(quadrant_length):
         if quadrant_length == 0:
             return np.ones((1, 1), dtype=np.float32)
@@ -103,7 +102,7 @@ class Brush:
         return kernel
 
     @staticmethod
-    @njit(cache=True, fastmath=True)
+    # @njit(cache=True, fastmath=True)
     def Compute_Cos_Kernel(quadrant_length):
         if quadrant_length == 0:
             return np.ones((1, 1), dtype=np.float32)
@@ -117,7 +116,7 @@ class Brush:
         return kernel
 
     def Compute_Kernel(self, quadrant_length):
-        # print(self.palette.Get_Kernel_Type(), quadrant_length)\
+        # print(self.palette.Get_Kernel_Type(), quadrant_length)
 
         if "cos" == self.palette.Get_Kernel_Type():
             return self.Compute_Cos_Kernel(quadrant_length)
@@ -191,7 +190,7 @@ class Brush:
                     self.setting_brush_size = False
 
 
-            # If we want to change the brush str                                                                            `   ength
+            # If we want to change the brush strength
             elif self.setting_brush_strength:
                 scaling = 1
                 if keys[pygame.K_LSHIFT]:
@@ -297,9 +296,8 @@ class Canvas:
         self.screen = screen
         self.shape = shape
         self.tile_size = tile_size
-
         self.pos = np.array(
-            [start_pos[0], start_pos[1], shape[1] * tile_size, shape[0] * tile_size],
+            [start_pos[0], start_pos[1], shape[1] * self.tile_size, shape[0] * self.tile_size],
             dtype=np.uint32)
 
         self.drawn_curve = None
@@ -310,11 +308,20 @@ class Canvas:
         self.saved_folder_path = saved_folder_path
         if os.path.isfile(f"{self.saved_folder_path}/Buffer.npz"):
             snapshots = np.load(f"{self.saved_folder_path}/Buffer.npz", allow_pickle=True)["buffer"]
-            self.buffer = Linked_List(snapshots)
+            if snapshots[0].shape[:2][::-1] == self.shape:
+                self.buffer = Linked_List(snapshots)
+            else:
+                # If the shapes are not the same then we just reload the canvas as blank
+                self.buffer = Linked_List()
+                self.canvas_pixels = np.ones((*self.shape[::-1], 3), dtype=np.float32) * 255
+                self.buffer.Add(np.array(self.canvas_pixels))
         else:
             self.buffer = Linked_List()
+            self.canvas_pixels = np.ones((*self.shape[::-1], 3), dtype=np.float32) * 255
             self.buffer.Add(np.array(self.canvas_pixels))
         self.canvas_pixels = np.array(self.buffer.pointer.snapshot, dtype=np.float32)
+        # print(self.canvas_pixels.shape)
+        # print(self.Scale_Image(self.canvas_pixels).shape)
         pygame.surfarray.blit_array(self.image,
                                     self.Scale_Image(self.canvas_pixels))
 
@@ -627,6 +634,7 @@ if __name__ == "__main__":
     pygame_icon = pygame.transform.scale(pygame.image.load("icons/FADS_icon.png").convert(), (32, 32))
     pygame.display.set_icon(pygame_icon)
     clock = pygame.time.Clock()
+    display_refreshrate = pygame.display.get_current_refresh_rate()
     pygame.mouse.set_visible(False)
 
     saved_folder_path = "Save"
@@ -637,14 +645,14 @@ if __name__ == "__main__":
 
     canvas = Canvas(screen=screen,
                     start_pos=(100, 400),
-                    shape=(120, 210),
-                    tile_size=6,
+                    shape=(120, 211),
+                    tile_size=5,
                     brush_radius=20,
                     saved_folder_path=saved_folder_path,
                     falloff="linear")
     running = True
     while running:
-        # clock.tick(60)
+        clock.tick(display_refreshrate)
         pygame_events = pygame.event.get()
         screen.fill((153, 207, 224))
 

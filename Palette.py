@@ -232,12 +232,6 @@ class Color_Wheel:
         return best_position
 
     def Set_Color(self, target_color: np.array) -> np.array:
-        """
-        This can only be an approximation as we are missing some colors (can't get every combination possible)
-        Thus we must do a loss calculation to get the closest color
-        :param rgb: red blue green target array
-        :return: np.array (r, g, b)
-        """
         brightness = colorsys.rgb_to_hsv(*target_color)[-1] / 255
 
         self.color_pin[2] = brightness
@@ -316,7 +310,7 @@ class Palette:
 
         self.pos = np.array([starting_coord[0],
                              starting_coord[1],
-                             8 * (button_size + self.border_width + 3) + 150 + 75 + self.border_width,
+                             7.5 * (button_size + self.border_width + 3) + 150 + 75 + 2 * self.border_width,
                              2 * (button_size + self.border_width)], dtype=np.int16)
 
         self.color_wheel = Color_Wheel(radius=75,
