@@ -2,7 +2,7 @@ import os
 import numpy as np
 import pygame
 import pygame.gfxdraw
-from numba import njit
+# from numba import njit
 import colorsys
 
 
@@ -212,7 +212,7 @@ class Color_Wheel:
         self.Find_Closest_Color(self.color_wheel, np.array([255, 255, 0]))
 
     @staticmethod
-    @njit(cache=True, nogil=True)
+    # @njit(cache=True, nogil=True)
     def Find_Closest_Color(color_wheel, target_color):
         best_loss = np.inf
         best_position = (-1, -1)
@@ -384,11 +384,6 @@ class Palette:
 
         # Set the default kernel type
         self.kernel_type, self.selected_smoothing_button = "quadratic", self.smoothing_buttons[2]
-
-        # Todo create a file where we store all the preloaded colors like (red, blue, green, light x)
-        # If the file is not there we create one
-        # When saving we overwrite the previous file if there is any
-        # implement the save when the user quits the game
 
         # Note that if self.is_selected_color_picker is True it should overwrite the smoothing buttons
         self.is_selected_color_picker = False

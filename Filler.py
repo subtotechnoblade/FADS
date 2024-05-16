@@ -3,15 +3,6 @@ from scipy import ndimage
 
 
 def Color_Fill(input_array, start_coords, threshold=0):
-    # Fills the connected region of start_coords in input_array with fill_value.
-    # Idea formulated by GPT4 but fully understood and modified to implement threshold
-    #
-    # :param input_array: Numpy array representing the image
-    # :param start_coords: Tuple (x, y) coordinates to start filling
-    # :param fill_value: The color value to fill the area with
-    # :param threshold: How much we allow the color to differ so that we fill
-    # :return: Modified array with filled area
-
     # Copy the array to avoid changing the original image
     output_array = np.copy(input_array)
 
@@ -32,17 +23,6 @@ fill_kernel = np.ones((3, 3), dtype=np.bool_)
 
 
 def Line_Fill(input_array, start_coords, threshold=0):
-
-    # Fills the connected region of start_coords in input_array with fill_value.
-    # Detects diagonal pixels while color_fill doesn't
-    # Idea formulated by GPT4 but fully understood and modified to implement threshold
-    #
-    # :param input_array: Numpy array representing the image
-    # :param start_coords: Tuple (x, y) coordinates to start filling
-    # :param fill_value: The color value to fill the area with
-    # :param threshold: How much we allow the color to differ so that we fill
-    # :return: Modified array with filled area
-
     # Copy the array to avoid changing the original image
     output_array = np.copy(input_array)
 
