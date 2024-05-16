@@ -632,7 +632,7 @@ if __name__ == "__main__":
     canvas = Canvas(screen=screen,
                     start_pos=(100, 400),
                     shape=(120, 210),
-                    tile_size=8,
+                    tile_size=4,
                     brush_radius=20,
                     saved_folder_path=saved_folder_path,
                     load_path=load_path,
