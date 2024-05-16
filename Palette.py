@@ -2,7 +2,7 @@ import os
 import numpy as np
 import pygame
 import pygame.gfxdraw
-from numba import njit
+# from numba import njit
 import colorsys
 
 
@@ -212,7 +212,7 @@ class Color_Wheel:
         self.Find_Closest_Color(self.color_wheel, np.array([255, 255, 0]))
 
     @staticmethod
-    @njit(cache=True, nogil=True)
+    # @njit(cache=True, nogil=True)
     def Find_Closest_Color(color_wheel, target_color):
         best_loss = np.inf
         best_position = (-1, -1)
@@ -243,6 +243,7 @@ class Color_Wheel:
         self.color_pin[2] = brightness
         self.Update_Color_Wheel()  # we update the color after we have updated the brightness
         self.color_pin[0], self.color_pin[1] = self.Find_Closest_Color(self.color_wheel, target_color=target_color)
+        self.Update_Color_Wheel()
 
     def Get_Color_Pin(self):
         return self.color_pin
@@ -334,7 +335,6 @@ class Palette:
                 color=np.array(self.color_wheel.color_wheel[75][75], dtype=np.float32))
 
             self.color_buckets.append(color_bucket)
-        x = np.array(self.color_wheel.color_wheel[75][75])
 
         for i in range(8):
             color_bucket = Color_bucket(pos=np.array([i * (button_size + 3) + starting_coord[0] + self.border_width,
@@ -369,13 +369,10 @@ class Palette:
             best_x, best_y = self.color_wheel.Find_Closest_Color(self.color_wheel.color_wheel, np.array(color))
             self.Set_Color(self.color_buckets[color_bucket_id], self.color_wheel.color_wheel[best_x][best_y])
 
-        self.color_wheel.Set_Color_Pin(np.array([75, 75, 1.0], dtype=np.float32))
+        self.color_wheel.Set_Color_Pin(self.color_buckets[10].Get_Color_Pin())
         self.selected_color_bucket = self.color_buckets[10]
 
         self.smoothing_buttons = []
-        # todo "Get all the sprite image paths for the smoothing curve icons
-        # and update the Render_button code to use the sprite if Ming ever finishes that"
-        # fuck
 
         for i, (kernel_type, sprite_path) in enumerate(
                 [("constant", "icons/Constant.png"),
