@@ -20,9 +20,6 @@ from Palette import Palette
 from Linked_List import Linked_List
 from Filler import Color_Fill, Line_Fill
 
-# import time
-
-import matplotlib.pyplot as plt
 
 # np.set_printoptions(threshold=np.inf)
 scipy.fftpack = pyfftw.interfaces.scipy_fftpack
