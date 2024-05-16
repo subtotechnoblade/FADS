@@ -375,7 +375,7 @@ class Palette:
 
         for i, (kernel_type, sprite_path) in enumerate(
                 [("constant", "icons/Constant.png"),
-                 ("linear", "icons/Constant.png"),
+                 ("linear", "icons/Linear.png"),
                  ("quadratic", "icons/Quadratic.png"),
                  ("cos", "icons/Cos.png")]):
             self.smoothing_buttons.append(
