@@ -1,7 +1,8 @@
+import os
 import numpy as np
 import pygame
 import pygame.gfxdraw
-from numba import njit
+# from numba import njit
 import colorsys
 
 
@@ -71,7 +72,7 @@ class Color_bucket(Button):
         self.RGB = color
         self.color_pin = color_pin
 
-    def Set_RGB(self, rgb: np.array, color_pin):
+    def Set_RGB(self, rgb: np.array, color_pin: np.array):
         self.RGB = rgb
         self.color_pin = color_pin
 
@@ -91,12 +92,13 @@ class Color_bucket(Button):
 
 def HSV_To_RGB(h, s, v):
     # Written by stackoverflow https://stackoverflow.com/questions/24852345/hsv-to-rgb-color-conversion
+    # I have no idea what is going on
     shape = h.shape
-    i = np.int_(h * 6.)
-    f = h * 6. - i
+    i = np.int_(h * 6.0)
+    f = h * 6.0 - i
 
     q = f
-    t = 1. - f
+    t = 1.0 - f
     i = np.ravel(i)
     f = np.ravel(f)
     i %= 6
@@ -138,9 +140,10 @@ class Color_Wheel:
 
         self.color_wheel = np.transpose(Generate_Colour_Wheel(self.size, value=1),
                                         axes=(1, 0, 2)) * self.Create_Circular_Mask(True) * 255.0
-
+        self.is_mouse_over_color_wheel = False
+        self.is_mouse_over_brightness_slider = False
         self.is_pressed = False
-        self.color_pin = np.array([self.radius + 1, self.radius + 1, 1.0], dtype=np.float32)
+        self.color_pin = np.array([self.radius, self.radius, 1.0], dtype=np.float32)
 
         self.slider_array = np.tile(np.arange(1, 0, -1 / 150), reps=(10, 1)) * 255.0
         self.slider_array = np.ones(3) * self.slider_array[:, :, np.newaxis]
@@ -166,14 +169,16 @@ class Color_Wheel:
     def Pressed_Color_Wheel(self, mouse_x, mouse_y):
         keys = pygame.key.get_pressed()
         mouse_pressed = pygame.mouse.get_pressed()[0]
-        if mouse_pressed:
-            if (mouse_x - self.center[0]) ** 2 + (mouse_y - self.center[1]) ** 2 <= self.radius ** 2:
+        self.is_mouse_over_color_wheel = False
+        if (mouse_x - self.center[0]) ** 2 + (mouse_y - self.center[1]) ** 2 <= self.radius ** 2:
+            self.is_mouse_over_color_wheel = True
+            if mouse_pressed:
                 self.is_pressed = True
                 if keys[pygame.K_LSHIFT]:
-                    self.color_pin[:2] = np.array([self.radius + 1, self.radius + 1], dtype=np.float32)
+                    self.color_pin[:2] = np.array([self.radius, self.radius], dtype=np.float32)
                     return
 
-                self.color_pin[:2] = np.array([mouse_x - self.pos[0], mouse_y - self.pos[1]])
+                self.color_pin[:2] = np.array([mouse_x - self.pos[0], mouse_y - self.pos[1]], dtype=np.float32)
                 return
         if not mouse_pressed:
             self.is_pressed = False
@@ -181,11 +186,14 @@ class Color_Wheel:
     def Pressed_Slider(self, mouse_x, mouse_y):
         keys = pygame.key.get_pressed()
         mouse_pressed = pygame.mouse.get_pressed()[0]
-        if mouse_pressed:
-            x, y = self.pos[0] + 160, self.pos[1]
-            if x <= mouse_x <= x + 10 and y <= mouse_y <= y + 150:
+
+        self.is_mouse_over_brightness_slider = False
+        x, y = self.pos[0] + 160, self.pos[1]
+        if x <= mouse_x <= x + 10 and y <= mouse_y <= y + 150:
+            self.is_mouse_over_brightness_slider = True
+            if mouse_pressed:
                 if keys[pygame.K_LSHIFT]:
-                    self.color_pin[2] = 1
+                    self.color_pin[2] = 1.0
                 else:
                     self.color_pin[2] = 1.0 - (mouse_y - self.pos[1]) / 150
 
@@ -245,18 +253,32 @@ class Color_Wheel:
         self.Pressed_Slider(mouse_x, mouse_y)
 
     def Draw(self):
+        # draw the hovering border if the mouse hovers over the color wheel
+        if self.is_mouse_over_color_wheel:
+            pygame.gfxdraw.filled_circle(self.screen,
+                                         *self.center,
+                                         self.radius + 4,
+                                         (0, 255, 127))
+            pygame.gfxdraw.aacircle(self.screen,
+                                    *self.center,
+                                    self.radius + 4,
+                                    (0, 255, 127))
+        if self.is_mouse_over_brightness_slider:
+            # 150, 10
+            pygame.draw.rect(self.screen, (0, 255, 127), (self.pos[0] + 160 - 4, self.pos[1] - 4, 18, 158))
+
         # Draw the color wheel
         # not sure if this code is efficient
         color_wheel_surf = pygame.Surface((self.size, self.size), flags=pygame.SRCALPHA, depth=32)
         pygame.surfarray.blit_array(color_wheel_surf, self.color_wheel)
-        alpha = pygame.surfarray.pixels_alpha(color_wheel_surf)
+        alpha_mask = pygame.surfarray.pixels_alpha(color_wheel_surf)
 
-        alpha[:] = self.Create_Circular_Mask() * 255
+        alpha_mask[:] = self.Create_Circular_Mask() * 255
 
-        del alpha
+        del alpha_mask
         self.screen.blit(color_wheel_surf, self.pos[:2])
 
-        # draw the border
+        # draw the color wheel border
         pygame.gfxdraw.aacircle(self.screen,
                                 *self.center,
                                 self.radius,
@@ -283,7 +305,7 @@ class Color_Wheel:
 
 
 class Palette:
-    def __init__(self, screen, starting_coord: np.array, button_size=75):
+    def __init__(self, screen, starting_coord: np.array, saved_folder_path, button_size=75):
         self.screen = screen
         self.border_width = 15
 
@@ -296,35 +318,61 @@ class Palette:
                                        pos=np.array([self.pos[0] + 7 * (button_size + self.border_width + 3),
                                                      self.pos[1] + self.border_width, 150, 150]),
                                        screen=self.screen)
-        self.buttons = []
+        self.color_buckets = []
         for i in range(8):
-            button = Color_bucket(pos=np.array(
+            color_bucket = Color_bucket(pos=np.array(
                 [i * (button_size + 3) + starting_coord[0] + self.border_width, starting_coord[1] + self.border_width,
                  button_size,
                  button_size],
                 dtype=np.int16),
                 screen=self.screen,
-                color_pin=np.array([75, 75, 1.0]),
-                color=np.array(self.color_wheel.color_wheel[75][75]))
+                color_pin=np.array([75, 75, 1.0], dtype=np.float32),
+                color=np.array(self.color_wheel.color_wheel[75][75], dtype=np.float32))
 
-            self.buttons.append(button)
+            self.color_buckets.append(color_bucket)
+        x = np.array(self.color_wheel.color_wheel[75][75])
 
         for i in range(8):
-            button = Color_bucket(pos=np.array([i * (button_size + 3) + starting_coord[0] + self.border_width,
-                                                starting_coord[1] + button_size + 3 + self.border_width, button_size,
-                                                button_size],
-                                               dtype=np.int16),
-                                  screen=self.screen,
-                                  color_pin=np.array([75, 75, 1.0]),
-                                  color=np.array(self.color_wheel.color_wheel[75][75]))
-            self.buttons.append(button)
+            color_bucket = Color_bucket(pos=np.array([i * (button_size + 3) + starting_coord[0] + self.border_width,
+                                                      starting_coord[1] + button_size + 3 + self.border_width,
+                                                      button_size,
+                                                      button_size],
+                                                     dtype=np.int16),
+                                        screen=self.screen,
+                                        color_pin=np.array([75, 75, 1.0], dtype=np.float32),
+                                        color=np.array(self.color_wheel.color_wheel[75][75], dtype=np.float32))
+            self.color_buckets.append(color_bucket)
 
-        self.selected_color_bucket = self.buttons[0]
+        # Loading Code
+        self.saved_folder_path = saved_folder_path
+        if os.path.isfile(f"{self.saved_folder_path}/Palette.npz"):
+            color_bucket_colors = np.load(f"{self.saved_folder_path}/Palette.npz", allow_pickle=True)["colors"]
+        else:
+            color_bucket_colors = np.array(
+                [[255, 0, 0],
+                 [220, 20, 60],
+                 [238, 75, 43],
+                 [253, 94, 83],
+                 [0, 0, 255],
+                 [0, 191, 255],
+                 [135, 206, 250],
+                 [255, 255, 0],
+                 [238, 175, 97],
+                 [251, 144, 98],
+                 ],
+                dtype=np.float32)
+        for color_bucket_id, color in enumerate(color_bucket_colors):
+            best_x, best_y = self.color_wheel.Find_Closest_Colour(self.color_wheel.color_wheel, color)
+            self.Set_Color(self.color_buckets[color_bucket_id], self.color_wheel.color_wheel[best_x][best_y])
+
+        self.color_wheel.Set_Color_Pin(np.array([75, 75, 1.0], dtype=np.float32))
+        self.selected_color_bucket = self.color_buckets[10]
 
         self.smoothing_buttons = []
         # todo "Get all the sprite image paths for the smoothing curve icons
         # and update the Render_button code to use the sprite if Ming ever finishes that"
         # fuck
+
         for i, (kernel_type, sprite_path) in enumerate(
                 [("constant", "icons/Constant.png"),
                  ("linear", "icons/Constant.png"),
@@ -355,8 +403,8 @@ class Palette:
                       starting_coord[1] + self.border_width,
                       30, 30], dtype=np.int16),
             screen=self.screen,
-            sprite_path="icons/Quadratic.png",
-            info=None)
+            sprite_path="icons/Color_Picker_Icon.png",
+            info=pygame.transform.scale(pygame.image.load("icons/Color_Picker_Icon.png").convert_alpha(), (30, 30)))
 
         self.is_moving = False
         self.prev_mouse_pos = np.array(pygame.mouse.get_pos(), dtype=np.int16)
@@ -366,8 +414,8 @@ class Palette:
     def Update_Pos(self, dx, dy):
         self.pos += np.array([dx, dy, 0, 0], dtype=np.int16)
         self.color_wheel.Update_Pos(dx, dy)
-        for button in self.buttons:
-            button.Update_Pos(dx, dy)
+        for color_bucket in self.color_buckets:
+            color_bucket.Update_Pos(dx, dy)
 
         for smoothing_button in self.smoothing_buttons:
             smoothing_button.Update_Pos(dx, dy)
@@ -380,9 +428,16 @@ class Palette:
     def Cache_Color(self):
         self.cached_color = (self.selected_color_bucket.Get_Color(), self.selected_color_bucket.Get_Color_Pin())
 
-    def Set_Color(self, target_color: np.array) -> np.array:
+    def Set_Color(self, target_color_bucket, target_color: np.array) -> np.array:
         self.color_wheel.Set_Color(target_color)
-        self.selected_color_bucket.Set_RGB(self.color_wheel.Get_Color(), self.color_wheel.Get_Color_Pin())
+        target_color_bucket.Set_RGB(self.color_wheel.Get_Color(), np.copy(self.color_wheel.Get_Color_Pin()))
+
+    def Save_Palette(self):
+        bucket_colors = np.zeros((16, 3), dtype=np.float32)
+        for i, color_bucket in enumerate(self.color_buckets):
+            bucket_colors[i] = color_bucket.Get_Color()
+        np.savez_compressed(f"{self.saved_folder_path}/Palette.npz", colors=bucket_colors)
+        print("Save Successful")
 
     def Get_Kernel_Type(self):
         return self.kernel_type
@@ -392,8 +447,8 @@ class Palette:
         if not (x <= mouse_x <= x + w and y <= mouse_y <= y + h):
             return
 
-        for button_id, button in enumerate(self.buttons):
-            button.Collided_With_Mouse(mouse_x, mouse_y)
+        for color_bucket_id, color_bucket in enumerate(self.color_buckets):
+            color_bucket.Collided_With_Mouse(mouse_x, mouse_y)
 
         for smoothing_button in self.smoothing_buttons:
             smoothing_button.Collided_With_Mouse(mouse_x, mouse_y)
@@ -404,10 +459,10 @@ class Palette:
         x, y, w, h = self.pos
         if not (x <= mouse_x <= x + w and y <= mouse_y <= y + h):
             return
-
-        for button in self.buttons:
-            if button.Collided_With_Mouse(mouse_x, mouse_y):
-                self.selected_color_bucket = button
+        self.color_picker.Collided_With_Mouse(mouse_x, mouse_y)
+        for color_buckets in self.color_buckets:
+            if color_buckets.Collided_With_Mouse(mouse_x, mouse_y):
+                self.selected_color_bucket = color_buckets
                 self.color_wheel.Set_Color_Pin(self.selected_color_bucket.color_pin)
                 return
 
@@ -439,6 +494,7 @@ class Palette:
 
         if not self.is_moving and not self.is_selected_color_picker:
             self.color_wheel.Update()
+
             self.Update_Hover_Selector(mouse_x, mouse_y)
             if mouse_pressed[0]:
                 self.Update_Current_Selector(mouse_x, mouse_y)
@@ -447,6 +503,9 @@ class Palette:
             new_color = self.color_wheel.Get_Color()
             if (*new_color,) != (*self.selected_color_bucket.Get_Color(),):
                 self.selected_color_bucket.Set_RGB(new_color, self.color_wheel.Get_Color_Pin())
+
+        # Must update after because it isn't possible to update with not self.is_selected_color_picker in the if statement
+        self.color_picker.Collided_With_Mouse(mouse_x, mouse_y)
 
     def Update_After_Render(self, pygame_events: pygame.event):
         mouse_pressed = pygame.mouse.get_pressed()
@@ -472,7 +531,7 @@ class Palette:
                 # checks for color confirmation or confirmation
                 if event.type == pygame.MOUSEBUTTONDOWN and self.is_selected_color_picker:
                     if mouse_pressed[0]:
-                        self.Set_Color(target_color)
+                        self.Set_Color(self.selected_color_bucket, target_color)
                         self.is_selected_color_picker = not self.is_selected_color_picker
                     elif mouse_pressed[2]:
                         old_color, old_pin = self.cached_color
@@ -489,8 +548,8 @@ class Palette:
 
         self.color_wheel.Draw()
 
-        for button in self.buttons:
-            button.Render_Button(hover_color=(0, 255, 127))
+        for color_bucket in self.color_buckets:
+            color_bucket.Render_Button(hover_color=(0, 255, 127))
 
         pygame.draw.rect(self.screen, color=(0, 134, 223), rect=self.selected_smoothing_button.border)
         for smoothing_button in self.smoothing_buttons:
@@ -523,7 +582,7 @@ if __name__ == "__main__":
         # keys = pygame.key.get_pressed()
         pygame_events = pygame.event.get()
         screen.fill((255, 255, 255))
-        palette.Update(pygame_events)
+        palette.Update(*pygame.mouse.get_pos(), pygame.mouse.get_pressed(), pygame_events)
         # delta_mouse = np.array(pygame.mouse.get_pos(), dtype=np.float32) - mouse_coord
         # mouse_coord = np.array(pygame.mouse.get_pos(), dtype=np.float32)
         palette.Draw()

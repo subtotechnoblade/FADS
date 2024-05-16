@@ -1,3 +1,6 @@
+import numpy as np
+
+
 class Node(object):
     __slots__ = "snapshot", "next", "parent"
 
@@ -8,12 +11,17 @@ class Node(object):
 
 
 class Linked_List:
-    def __init__(self):
+    def __init__(self, snapshots=None):
         self.start = None
         self.end = None
 
         # points to the current
         self.pointer = None
+
+        if snapshots is not None and len(snapshots) != 0:
+            for snapshot in snapshots:
+                self.Add(snapshot)
+            assert self.pointer == self.end
 
     def Add(self, snapshot):
         if self.start is None:
@@ -34,3 +42,12 @@ class Linked_List:
         else:
             if self.pointer.next is not None:
                 self.pointer = self.pointer.next
+
+    def To_Array(self):
+        snapshots = []
+        node = self.start
+        while node is not None:
+            snapshots.append(node.snapshot)
+            node = node.next
+        return np.array(snapshots)
+

@@ -186,11 +186,6 @@ class Brush:
                     self.cursor.update(self.mouse_pos[0] - self.radius, self.mouse_pos[1] - self.radius,
                                        2 * self.radius, 2 * self.radius)
 
-                    # Todo: add new method to get the current kernel
-                    # In order to change the current kernel, and re compute it
-                    # make a new method that does that based on the current kernel selection
-                    # also implement that (current kernel selection)
-
                     quadrant_length = int(self.radius / 4)
                     self.kernel = self.Compute_Kernel(quadrant_length) / (quadrant_length if quadrant_length > 0 else 1)
 
@@ -301,7 +296,8 @@ class Brush:
 
 
 class Canvas:
-    def __init__(self, screen, start_pos, shape, tile_size=5, brush_radius=10, load_path="", falloff="linear"):
+    def __init__(self, screen, start_pos, shape, tile_size=5, brush_radius=10, saved_folder_path="", load_path="",
+                 falloff="linear"):
         self.screen = screen
         self.shape = shape
         self.tile_size = tile_size
@@ -319,16 +315,25 @@ class Canvas:
         else:
             data = np.load(load_path, allow_pickle=True)
             self.canvas_pixels = data["inputs"].astype(np.float32)
-            pygame.surfarray.blit_array(self.image,
-                                        self.Scale_Image(self.canvas_pixels))
 
         # start of the undo redo function
-        self.buffer = Linked_List()
-        self.buffer.Add(np.array(self.canvas_pixels))
+        self.saved_folder_path = saved_folder_path
+        if os.path.isfile(f"{self.saved_folder_path}/Buffer.npz"):
+            snapshots = np.load(f"{self.saved_folder_path}/Buffer.npz", allow_pickle=True)["buffer"]
+            self.buffer = Linked_List(snapshots)
+            if (not np.array_equal(self.canvas_pixels, self.buffer.pointer.snapshot)) and np.sum(255 - self.canvas_pixels) != 0:
+                self.buffer.Add(self.canvas_pixels)
+        else:
+            self.buffer = Linked_List()
+            self.buffer.Add(np.array(self.canvas_pixels))
+        self.canvas_pixels = np.array(self.buffer.pointer.snapshot, dtype=np.float32)
+        pygame.surfarray.blit_array(self.image,
+                                    self.Scale_Image(self.canvas_pixels))
+
 
         self.mouse_curve = deque()
 
-        self.palette = Palette(self.screen, self.pos[:2] - np.array([0, 225]))
+        self.palette = Palette(self.screen, self.pos[:2] - np.array([0, 225]), self.saved_folder_path)
 
         self.brush = Brush(screen=self.screen, radius=brush_radius, palette=self.palette, falloff=falloff)
         self.transform = np.array([self.tile_size, self.tile_size], dtype=np.uint16)
@@ -338,15 +343,32 @@ class Canvas:
 
         self.fill_threshold = 0
 
-    def Save(self, save_path, name, evaluation):
-        np.savez_compressed(f"{save_path}/{name}", inputs=self.canvas_pixels,
-                            outputs=np.array([evaluation], dtype=np.float32))
+    def Save(self, save_path, name, evaluation, comment):
+        np.savez_compressed(f"{save_path}/{name}",
+                            inputs=self.canvas_pixels,
+                            outputs=np.array([evaluation], dtype=np.float32),
+                            comment=comment)
+
+    def Save_State(self, ):
+        arr_buffer = self.buffer.To_Array()
+        print(f"{self.saved_folder_path}/Buffer.npz")
+        np.savez_compressed(f"{self.saved_folder_path}/Buffer.npz", buffer=arr_buffer)
+        print("Passed")
+        self.palette.Save_Palette()
 
     def Load(self, load_path):
         data = np.load(load_path, allow_pickle=True)
         self.canvas_pixels = data["inputs"]
         print(f"Loaded: {load_path}")
         print(f"Evaluation for this piece is {data['outputs']}")
+        try:
+            print(f"Comment is {data['comment']}")
+        except:
+            print("There is no comment on this piece, consider re-saving this and assigning the comment")
+            print("If you want to overwrite this, make sure to specify the same name as the loaded one")
+        self.buffer.Add(self.canvas_pixels)
+        pygame.surfarray.blit_array(self.image,
+                                    self.Scale_Image(self.canvas_pixels))
 
     def Check_Brush_Collision(self):
         return self.brush.cursor.colliderect(self.pos)
@@ -415,11 +437,12 @@ class Canvas:
         mouse_down = False
         mouse_pos = pygame.mouse.get_pos()
         mouse_x, mouse_y = mouse_pos
-        mouse_pressed = pygame.mouse.get_pressed()[0]
+        mouse_pressed = pygame.mouse.get_pressed()
 
         for event in pygame_events:
             if event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_down = True
+
             if ((event.type == pygame.MOUSEBUTTONDOWN and event.button == 1)
                     and not self.is_drawing and not (
                             self.brush.setting_brush_size or self.brush.setting_brush_strength)):
@@ -430,17 +453,31 @@ class Canvas:
                     self.drawn_curve = np.zeros((self.shape[1], self.shape[0]))
 
             if event.type == pygame.KEYDOWN:
+                # Redo
                 if keys[pygame.K_LCTRL] and keys[pygame.K_LSHIFT] and keys[pygame.K_z]:
                     self.buffer.Move_Pointer(1)
                     self.canvas_pixels = self.buffer.pointer.snapshot
                     pygame.surfarray.blit_array(self.image,
                                                 self.Scale_Image(self.canvas_pixels))
-
+                # Undo
                 elif keys[pygame.K_LCTRL] and keys[pygame.K_z]:
                     self.buffer.Move_Pointer(-1)
                     self.canvas_pixels = self.buffer.pointer.snapshot
                     pygame.surfarray.blit_array(self.image,
                                                 self.Scale_Image(self.canvas_pixels))
+
+                # Flip the canvas left or right
+                if keys[pygame.K_LEFT] or keys[pygame.K_RIGHT]:
+                    # up down because pygame inverts the x and y axis, thus fliplr is flipud
+                    self.canvas_pixels = np.flipud(self.canvas_pixels)
+                    if keys[pygame.K_LCTRL] or keys[pygame.K_RCTRL]:
+                        self.buffer.Add(np.array(self.canvas_pixels))
+
+                if keys[pygame.K_UP] or keys[pygame.K_DOWN]:
+                    self.canvas_pixels = np.fliplr(self.canvas_pixels)
+                    if keys[pygame.K_LCTRL] or keys[pygame.K_RCTRL]:
+                        self.buffer.Add(np.array(self.canvas_pixels))
+
             if event.type == pygame.KEYUP:
                 pygame.surfarray.blit_array(self.image,
                                             self.Scale_Image(self.canvas_pixels))
@@ -470,7 +507,7 @@ class Canvas:
                                   int((mouse_y - self.pos[1]) / self.tile_size)),
                                  threshold=self.fill_threshold)
 
-                if mouse_pressed and mouse_down:  # if we confirm the fill
+                if mouse_pressed[0] and mouse_down:  # if we confirm the fill
                     self.canvas_pixels = self.Linear_Blend(self.palette.Get_Color(),
                                                            mask * self.brush.strength)
                     # add undo step into the buffer
@@ -486,7 +523,7 @@ class Canvas:
                                   (int((mouse_x - self.pos[0]) / self.tile_size),
                                    int((mouse_y - self.pos[1]) / self.tile_size)),
                                   threshold=self.fill_threshold)
-                if mouse_pressed and mouse_down:  # if we confirm the fill
+                if mouse_pressed[0] and mouse_down:  # if we confirm the fill
                     self.canvas_pixels = self.Linear_Blend(self.palette.Get_Color(),
                                                            mask * self.brush.strength)
                     # add an undo step into the buffer
@@ -533,7 +570,7 @@ class Canvas:
         if not self.mouse_curve or ((mouse_x, mouse_y) not in self.mouse_curve and self.is_drawing):
             self.mouse_curve.append((mouse_x, mouse_y))
 
-        if (not mouse_pressed) and not (
+        if (not mouse_pressed[0]) and not (
                 self.brush.setting_brush_size or self.brush.setting_brush_strength):
             # confirm drawing code
             if self.is_drawing and self.mask is not None:
@@ -562,7 +599,8 @@ class Canvas:
             mouse_x, mouse_y = pygame.mouse.get_pos()
 
             # Todo change this to the color picker icon
-            pygame.draw.rect(self.screen, (0, 0, 0), (mouse_x, mouse_y, 10, 10), width=5)
+            # pygame.draw.rect(self.screen, (0, 0, 0), (mouse_x, mouse_y, 10, 10), width=5)
+            self.screen.blit(self.palette.color_picker.info, (mouse_x, mouse_y - 30))
 
 
 if __name__ == "__main__":
@@ -576,8 +614,13 @@ if __name__ == "__main__":
     # pygame.event.set_allowed([pygame.QUIT, pygame.KEYDOWN, pygame.MOUSEBUTTONUP, pygame.MOUSEBUTTONDOWN])
 
     pygame.display.set_caption("Fine Arts Drawing Simulator")
+    pygame_icon = pygame.transform.scale(pygame.image.load("icons/FADS_icon.png").convert(), (32, 32))
+    pygame.display.set_icon(pygame_icon)
     clock = pygame.time.Clock()
     pygame.mouse.set_visible(False)
+
+    saved_folder_path = "Save"
+    os.makedirs(saved_folder_path, exist_ok=True)
 
     save_path = "Paintings"
     os.makedirs(save_path, exist_ok=True)
@@ -596,6 +639,7 @@ if __name__ == "__main__":
                     shape=(120, 210),
                     tile_size=5,
                     brush_radius=20,
+                    saved_folder_path=saved_folder_path,
                     load_path=load_path,
                     falloff="linear")
     running = True
@@ -613,29 +657,56 @@ if __name__ == "__main__":
             if event.type == pygame.KEYDOWN:
                 if keys[pygame.K_LCTRL] and keys[pygame.K_s]:
                     name = input("Name of file:")
-                    valid = False
-                    while not valid:
+                    # code for getting the eval
+                    while True:
                         try:
                             evaluation = float(input("Evaluation of your art:"))
                             if -1 <= evaluation <= 1:
-                                valid = True
+                                break
                             else:
                                 print("Evaluation can only be between -1 and 1")
                         except:
                             print("BRu U gave some letters ")
-                    canvas.Save(save_path, name, evaluation)
+                    # code for getting the comment on the art
+                    while True:
+                        comment = input("Comment for this art:")
+                        if comment != "":
+                            break
+                        else:
+                            print("Please do not give '' as the comment")
+                    canvas.Save(save_path, name, evaluation, comment=np.array(comment, dtype=object))
                 elif keys[pygame.K_LCTRL] and keys[pygame.K_l]:
-                    valid = False
-                    while not valid:
+                    while True:
                         name = input("Load file name:")
                         if os.path.exists(f"Paintings/{name}.npz"):
-                            valid = True
+                            break
                         else:
                             print("Name not found in paintings")
                     canvas.Load(f"Paintings/{name}.npz")
                     print()
 
+                if keys[pygame.K_x] and keys[pygame.K_LCTRL]:
+                    while True:
+                        try:
+                            option = int(input("1, 2, 3, for deleting all, Buffer state, Palette state"))
+                            break
+                        except:
+                            print("Please try again with the given options")
+                    if option == 1:
+                        if os.path.isfile(f"{saved_folder_path}/Buffer.npz"):
+                            os.remove(f"{saved_folder_path}/Buffer.npz")
+                        if os.path.isfile(f"{saved_folder_path}/Palette.npz"):
+                            os.remove(f"{saved_folder_path}/Palette.npz")
+                    elif option == 2:
+                        if os.path.isfile(f"{saved_folder_path}/Buffer.npz"):
+                            os.remove(f"{saved_folder_path}/Buffer.npz")
+                    else:
+                        if os.path.isfile(f"{saved_folder_path}/Palette.npz"):
+                            os.remove(f"{saved_folder_path}/Palette.npz")
+
+
             if event.type == pygame.QUIT:
+                canvas.Save_State()
                 running = False
                 # break
         pygame.display.flip()
