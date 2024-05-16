@@ -2,7 +2,7 @@ import os
 import numpy as np
 import pygame
 import pygame.gfxdraw
-# from numba import njit
+from numba import njit
 import colorsys
 
 
@@ -148,6 +148,8 @@ class Color_Wheel:
         self.slider_array = np.tile(np.arange(1, 0, -1 / 150), reps=(10, 1)) * 255.0
         self.slider_array = np.ones(3) * self.slider_array[:, :, np.newaxis]
 
+        self.Numba_Warmup()
+
     def Create_Circular_Mask(self, full=False):
         coords = np.arange(self.size)
         mask = (coords - self.radius) ** 2 + (coords.reshape((-1, 1)) - self.radius) ** 2 <= self.radius ** 2
@@ -206,12 +208,14 @@ class Color_Wheel:
     def Get_Color(self):
         return self.color_wheel[int(self.color_pin[0])][int(self.color_pin[1])]
 
+    def Numba_Warmup(self):
+        self.Find_Closest_Color(self.color_wheel, np.array([255, 255, 0]))
+
     @staticmethod
-    # @njit(cache=True, nogil=True)
-    def Find_Closest_Colour(color_wheel, target_color):
+    @njit(cache=True, nogil=True)
+    def Find_Closest_Color(color_wheel, target_color):
         best_loss = np.inf
         best_position = (-1, -1)
-
         if np.sum(target_color) == 0:
             return 75, 75
 
@@ -238,7 +242,7 @@ class Color_Wheel:
 
         self.color_pin[2] = brightness
         self.Update_Color_Wheel()  # we update the color after we have updated the brightness
-        self.color_pin[0], self.color_pin[1] = self.Find_Closest_Colour(self.color_wheel, target_color=target_color)
+        self.color_pin[0], self.color_pin[1] = self.Find_Closest_Color(self.color_wheel, target_color=target_color)
 
     def Get_Color_Pin(self):
         return self.color_pin
@@ -362,7 +366,7 @@ class Palette:
                  ],
                 dtype=np.float32)
         for color_bucket_id, color in enumerate(color_bucket_colors):
-            best_x, best_y = self.color_wheel.Find_Closest_Colour(self.color_wheel.color_wheel, color)
+            best_x, best_y = self.color_wheel.Find_Closest_Color(self.color_wheel.color_wheel, np.array(color))
             self.Set_Color(self.color_buckets[color_bucket_id], self.color_wheel.color_wheel[best_x][best_y])
 
         self.color_wheel.Set_Color_Pin(np.array([75, 75, 1.0], dtype=np.float32))
@@ -513,7 +517,7 @@ class Palette:
         keys = pygame.key.get_pressed()
 
         if self.is_selected_color_picker:
-            target_color = self.screen.get_at((mouse_x, mouse_y))[:3]
+            target_color = np.array(self.screen.get_at((mouse_x, mouse_y))[:3])
             self.selected_color_bucket.Set_RGB(target_color, None)
         if not self.is_moving:
             for event in pygame_events:
