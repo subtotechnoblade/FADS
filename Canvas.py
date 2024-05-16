@@ -35,7 +35,7 @@ def Compute_Circular_Mask(radius):
     return (coords - radius) ** 2 + (coords.reshape((-1, 1)) - radius) ** 2 <= radius ** 2
 
 
-# @njit(cache=True, nogil=True, fastmath=True)
+@njit(cache=True, nogil=True, fastmath=True)
 def Compute_Distance(radius):
     size = 2 * radius + 1
     coords = np.arange(size, dtype=np.float32)
@@ -632,14 +632,14 @@ if __name__ == "__main__":
     canvas = Canvas(screen=screen,
                     start_pos=(100, 400),
                     shape=(120, 210),
-                    tile_size=5,
+                    tile_size=8,
                     brush_radius=20,
                     saved_folder_path=saved_folder_path,
                     load_path=load_path,
                     falloff="linear")
     running = True
     while running:
-        clock.tick(60)
+        # clock.tick(60)
         pygame_events = pygame.event.get()
         screen.fill((153, 207, 224))
 
