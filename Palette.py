@@ -375,10 +375,10 @@ class Palette:
         self.smoothing_buttons = []
 
         for i, (kernel_type, sprite_path) in enumerate(
-                [("constant", "icons/Constant.png"),
-                 ("linear", "icons/Linear.png"),
-                 ("quadratic", "icons/Quadratic.png"),
-                 ("cos", "icons/Cos.png")]):
+                [("constant", "icons/Constant_Icon.png"),
+                 ("linear", "icons/Linear_Icon.png"),
+                 ("quadratic", "icons/Quadratic_Icon.png"),
+                 ("cos", "icons/Cos_Icon.png")]):
             self.smoothing_buttons.append(
                 Misc_Selector(
                     np.array([starting_coord[0] + 175 + button_size + 6.5 * (button_size + self.border_width + 3),
