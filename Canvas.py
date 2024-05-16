@@ -7,7 +7,7 @@ import pygame
 import pygame.gfxdraw
 
 import numpy as np
-# from numba import njit
+from numba import njit
 
 from splines import CatmullRom
 
@@ -28,7 +28,7 @@ pyfftw.config.NUM_THREADS = os.cpu_count()
 pyfftw.interfaces.cache.enable()
 
 
-# @njit(cache=True, nogil=True, fastmath=True)
+@njit(cache=True, nogil=True, fastmath=True)
 def Compute_Circular_Mask(radius):
     size = 2 * radius + 1
     coords = np.arange(size, dtype=np.float32)
@@ -92,7 +92,7 @@ class Brush:
         return distance
 
     @staticmethod
-    # @njit(cache=True, nogil=True, fastmath=True)
+    @njit(cache=True, nogil=True, fastmath=True)
     def Compute_Quadratic_Kernel(quadrant_length):
         if quadrant_length == 0:
             return np.ones((1, 1), dtype=np.float32)
@@ -104,7 +104,7 @@ class Brush:
         return kernel
 
     @staticmethod
-    # @njit(cache=True, fastmath=True)
+    @njit(cache=True, fastmath=True)
     def Compute_Cos_Kernel(quadrant_length):
         if quadrant_length == 0:
             return np.ones((1, 1), dtype=np.float32)
@@ -595,8 +595,6 @@ class Canvas:
         else:
             mouse_x, mouse_y = pygame.mouse.get_pos()
 
-            # Todo change this to the color picker icon
-            # pygame.draw.rect(self.screen, (0, 0, 0), (mouse_x, mouse_y, 10, 10), width=5)
             self.screen.blit(self.palette.color_picker.info, (mouse_x, mouse_y - 30))
 
 
