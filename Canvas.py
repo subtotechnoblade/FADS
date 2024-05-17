@@ -1,6 +1,5 @@
 import os
 # import sys
-# import ctypes
 from collections import deque
 
 import pygame
@@ -622,9 +621,9 @@ class Canvas:
 
 if __name__ == "__main__":
     os.environ["SDL_VIDEO_CENTERED"] = "1"
-    # import ctypes
-    # ctypes.windll.user32.SetProcessDPIAware()
-    # true_res = (ctypes.windll.user32.GetSystemMetrics(0), ctypes.windll.user32.GetSystemMetrics(1) - 50)
+    import ctypes
+    ctypes.windll.user32.SetProcessDPIAware()
+    true_res = (ctypes.windll.user32.GetSystemMetrics(0), ctypes.windll.user32.GetSystemMetrics(1) - 50)
     screen = pygame.display.set_mode((0, 0),
                                      pygame.DOUBLEBUF | pygame.HWSURFACE | pygame.HWACCEL | pygame.RESIZABLE,
                                      vsync=1)
