@@ -10,7 +10,7 @@ from numba import njit
 
 from splines import CatmullRom
 
-# import pyfftw
+import pyfftw
 import scipy.fftpack
 from scipy.fft import set_global_backend
 from scipy.signal import fftconvolve
@@ -20,10 +20,10 @@ from Linked_List import Linked_List
 from Filler import Color_Fill, Line_Fill
 
 
-# scipy.fftpack = pyfftw.interfaces.scipy_fftpack
-# set_global_backend(pyfftw.interfaces.scipy_fft)
-# pyfftw.config.NUM_THREADS = os.cpu_count()
-# pyfftw.interfaces.cache.enable()
+scipy.fftpack = pyfftw.interfaces.scipy_fftpack
+set_global_backend(pyfftw.interfaces.scipy_fft)
+pyfftw.config.NUM_THREADS = os.cpu_count()
+pyfftw.interfaces.cache.enable()
 
 
 @njit(cache=True, nogil=True, fastmath=True)
@@ -362,7 +362,7 @@ class Canvas:
         else:
             print(f"Color, Form, Acceptability: {data['outputs']}")
         try:
-            print(f"Comment is {data['comment']}")
+            print(f"Comment is: {data['comment']}")
         except:
             print("There is no comment on this piece, consider re-saving this and assigning the comment")
             print("If you want to overwrite this, make sure to specify the same name as the loaded one")
