@@ -168,24 +168,26 @@ class Color_Wheel:
         self.center[0] += dx
         self.center[1] += dy
 
-    def Pressed_Color_Wheel(self, mouse_x, mouse_y):
+    def Pressed_Color_Wheel(self, mouse_x, mouse_y, pygame_events):
         keys = pygame.key.get_pressed()
         mouse_pressed = pygame.mouse.get_pressed()[0]
         self.is_mouse_over_color_wheel = False
         if (mouse_x - self.center[0]) ** 2 + (mouse_y - self.center[1]) ** 2 <= self.radius ** 2:
             self.is_mouse_over_color_wheel = True
-            if mouse_pressed:
-                self.is_pressed = True
-                if keys[pygame.K_LSHIFT]:
-                    self.color_pin[:2] = np.array([self.radius, self.radius], dtype=np.float32)
-                    return
+            for event in pygame_events:
+                if event.type == pygame.MOUSEBUTTONDOWN and mouse_pressed:
+                    print(True)
+                    self.is_pressed = True
+                    if keys[pygame.K_LSHIFT]:
+                        self.color_pin[:2] = np.array([self.radius, self.radius], dtype=np.float32)
+                        return
 
-                self.color_pin[:2] = np.array([mouse_x - self.pos[0], mouse_y - self.pos[1]], dtype=np.float32)
-                return
+                    self.color_pin[:2] = np.array([mouse_x - self.pos[0], mouse_y - self.pos[1]], dtype=np.float32)
+            return
         if not mouse_pressed:
             self.is_pressed = False
 
-    def Pressed_Slider(self, mouse_x, mouse_y):
+    def Pressed_Slider(self, mouse_x, mouse_y, pygame_events):
         keys = pygame.key.get_pressed()
         mouse_pressed = pygame.mouse.get_pressed()[0]
 
@@ -193,15 +195,17 @@ class Color_Wheel:
         x, y = self.pos[0] + 160, self.pos[1]
         if x <= mouse_x <= x + 10 and y <= mouse_y <= y + 150:
             self.is_mouse_over_brightness_slider = True
-            if mouse_pressed:
-                if keys[pygame.K_LSHIFT]:
-                    self.color_pin[2] = 1.0
-                else:
-                    self.color_pin[2] = 1.0 - (mouse_y - self.pos[1]) / 150
+            for event in pygame_events:
+                if event.type == pygame.MOUSEBUTTONDOWN and mouse_pressed:
 
-                self.Update_Color_Wheel()
-                self.is_pressed = True
-                return
+                    if keys[pygame.K_LSHIFT]:
+                        self.color_pin[2] = 1.0
+                    else:
+                        self.color_pin[2] = 1.0 - (mouse_y - self.pos[1]) / 150
+
+                    self.Update_Color_Wheel()
+                    self.is_pressed = True
+                    return
         if not mouse_pressed:
             self.is_pressed = False
 
@@ -246,10 +250,9 @@ class Color_Wheel:
         self.color_pin = new_pin
         self.Update_Color_Wheel()
 
-    def Update(self):
-        mouse_x, mouse_y = pygame.mouse.get_pos()
-        self.Pressed_Color_Wheel(mouse_x, mouse_y)
-        self.Pressed_Slider(mouse_x, mouse_y)
+    def Update(self, mouse_x, mouse_y, pygame_events):
+        self.Pressed_Color_Wheel(mouse_x, mouse_y, pygame_events)
+        self.Pressed_Slider(mouse_x, mouse_y, pygame_events)
 
     def Draw(self):
         # draw the hovering border if the mouse hovers over the color wheel
@@ -483,11 +486,12 @@ class Palette:
         self.prev_mouse_pos = updated_pos
 
         if not self.is_moving and not self.is_selected_color_picker:
-            self.color_wheel.Update()
+            self.color_wheel.Update(mouse_x, mouse_y, pygame_events)
 
             self.Update_Hover_Selector(mouse_x, mouse_y)
-            if mouse_pressed[0]:
-                self.Update_Current_Selector(mouse_x, mouse_y)
+            for event in pygame_events:
+                if event.type == pygame.MOUSEBUTTONDOWN and mouse_pressed[0]:
+                    self.Update_Current_Selector(mouse_x, mouse_y)
 
             # keyboard shortcut for using color picker
             new_color = self.color_wheel.Get_Color()

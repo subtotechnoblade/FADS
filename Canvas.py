@@ -19,10 +19,10 @@ from Palette import Palette
 from Linked_List import Linked_List
 from Filler import Color_Fill, Line_Fill
 
-scipy.fftpack = pyfftw.interfaces.scipy_fftpack
-set_global_backend(pyfftw.interfaces.scipy_fft)
-pyfftw.config.NUM_THREADS = os.cpu_count()
-pyfftw.interfaces.cache.enable()
+# scipy.fftpack = pyfftw.interfaces.scipy_fftpack
+# set_global_backend(pyfftw.interfaces.scipy_fft)
+# pyfftw.config.NUM_THREADS = os.cpu_count()
+# pyfftw.interfaces.cache.enable()
 
 
 @njit(cache=True, nogil=True, fastmath=True)
@@ -188,7 +188,6 @@ class Brush:
                     self.new_radius = self.radius
                     self.setting_brush_size = False
 
-
             # If we want to change the brush strength
             elif self.setting_brush_strength:
                 scaling = 1
@@ -310,7 +309,7 @@ class Canvas:
             if snapshots[0].shape[:2][::-1] == self.shape:
                 self.buffer = Linked_List(snapshots)
             else:
-                # If the shapes are not the same then we just reload the canvas as blank
+                # If the shapes are not the same, then we just reload the canvas as blank
                 self.buffer = Linked_List()
                 self.canvas_pixels = np.ones((*self.shape[::-1], 3), dtype=np.float32) * 255
                 self.buffer.Add(np.array(self.canvas_pixels))
@@ -340,7 +339,7 @@ class Canvas:
     def Save(self, save_path, name, evaluation, comment):
         np.savez_compressed(f"{save_path}/{name}",
                             inputs=self.canvas_pixels,
-                            outputs=np.array([evaluation], dtype=np.float32),
+                            outputs=evaluation,
                             comment=comment)
 
     def Save_State(self, ):
@@ -582,8 +581,6 @@ class Canvas:
             elif self.clamp == 1:
                 if (self.mouse_curve[-1][0], mouse_y) not in self.mouse_curve:
                     self.mouse_curve.append((self.mouse_curve[-1][0], mouse_y))
-
-
             else:
                 self.mouse_curve.append((mouse_x, mouse_y))
 
@@ -622,6 +619,7 @@ class Canvas:
 if __name__ == "__main__":
     os.environ["SDL_VIDEO_CENTERED"] = "1"
     import ctypes
+
     ctypes.windll.user32.SetProcessDPIAware()
     true_res = (ctypes.windll.user32.GetSystemMetrics(0), ctypes.windll.user32.GetSystemMetrics(1) - 50)
     screen = pygame.display.set_mode((0, 0),
@@ -645,7 +643,7 @@ if __name__ == "__main__":
     canvas = Canvas(screen=screen,
                     start_pos=(100, 400),
                     shape=(120, 210),
-                    tile_size=5,
+                    tile_size=6,
                     brush_radius=20,
                     saved_folder_path=saved_folder_path,
                     falloff="linear")
@@ -667,11 +665,21 @@ if __name__ == "__main__":
                     # code for getting the eval
                     while True:
                         try:
-                            evaluation = float(input("Evaluation of your art:"))
-                            if -1 <= evaluation <= 1:
+                            color_evaluation = float(input("Evaluation of color:"))
+                            if -1 <= color_evaluation <= 1:
                                 break
                             else:
-                                print("Evaluation can only be between -1 and 1")
+                                print("Evaluations can only be between -1 and 1")
+                        except:
+                            print("BRu U gave some letters ")
+
+                    while True:
+                        try:
+                            form_evaluation = float(input("Evaluation of form:"))
+                            if -1 <= form_evaluation <= 1:
+                                break
+                            else:
+                                print("Evaluations can only be between -1 and 1")
                         except:
                             print("BRu U gave some letters ")
                     # code for getting the comment on the art
@@ -681,7 +689,7 @@ if __name__ == "__main__":
                             break
                         else:
                             print("Please do not give '' as the comment")
-                    canvas.Save(save_path, name, evaluation, comment=np.array(comment, dtype=object))
+                    canvas.Save(save_path, name, np.array([color_evaluation, form_evaluation]), comment=np.array(comment, dtype=object))
                 elif keys[pygame.K_LCTRL] and keys[pygame.K_l]:
                     while True:
                         name = input("Load file name:")
