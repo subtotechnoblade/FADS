@@ -2,7 +2,7 @@ import os
 import numpy as np
 import pygame
 import pygame.gfxdraw
-# from numba import njit
+from numba import njit
 import colorsys
 
 
@@ -212,7 +212,7 @@ class Color_Wheel:
         self.Find_Closest_Color(self.color_wheel, np.array([255, 255, 0]))
 
     @staticmethod
-    # @njit(cache=True, nogil=True)
+    @njit(cache=True, nogil=True)
     def Find_Closest_Color(color_wheel, target_color):
         best_loss = np.inf
         best_position = (-1, -1)
