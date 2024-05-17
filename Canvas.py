@@ -1,6 +1,6 @@
 import os
 # import sys
-import ctypes
+# import ctypes
 from collections import deque
 
 import pygame
@@ -622,9 +622,9 @@ class Canvas:
 
 if __name__ == "__main__":
     os.environ["SDL_VIDEO_CENTERED"] = "1"
-    ctypes.windll.user32.SetProcessDPIAware()
-    true_res = (ctypes.windll.user32.GetSystemMetrics(0), ctypes.windll.user32.GetSystemMetrics(1) - 50)
-    screen = pygame.display.set_mode(true_res,
+    # ctypes.windll.user32.SetProcessDPIAware()
+    # true_res = (ctypes.windll.user32.GetSystemMetrics(0), ctypes.windll.user32.GetSystemMetrics(1) - 50)
+    screen = pygame.display.set_mode((0, 0),
                                      pygame.DOUBLEBUF | pygame.HWSURFACE | pygame.HWACCEL | pygame.RESIZABLE,
                                      vsync=1)
 
@@ -634,7 +634,6 @@ if __name__ == "__main__":
     pygame_icon = pygame.transform.scale(pygame.image.load("icons/FADS_icon.png").convert(), (32, 32))
     pygame.display.set_icon(pygame_icon)
     clock = pygame.time.Clock()
-    display_refreshrate = pygame.display.get_current_refresh_rate()
     pygame.mouse.set_visible(False)
 
     saved_folder_path = "Save"
@@ -645,14 +644,14 @@ if __name__ == "__main__":
 
     canvas = Canvas(screen=screen,
                     start_pos=(100, 400),
-                    shape=(120, 211),
+                    shape=(120, 210),
                     tile_size=5,
                     brush_radius=20,
                     saved_folder_path=saved_folder_path,
                     falloff="linear")
     running = True
     while running:
-        clock.tick(display_refreshrate)
+        clock.tick(60)
         pygame_events = pygame.event.get()
         screen.fill((153, 207, 224))
 
