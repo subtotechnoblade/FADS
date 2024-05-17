@@ -10,7 +10,7 @@ from numba import njit
 
 from splines import CatmullRom
 
-import pyfftw
+# import pyfftw
 import scipy.fftpack
 from scipy.fft import set_global_backend
 from scipy.signal import fftconvolve
