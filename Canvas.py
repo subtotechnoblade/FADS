@@ -19,6 +19,7 @@ from Palette import Palette
 from Linked_List import Linked_List
 from Filler import Color_Fill, Line_Fill
 
+
 # scipy.fftpack = pyfftw.interfaces.scipy_fftpack
 # set_global_backend(pyfftw.interfaces.scipy_fft)
 # pyfftw.config.NUM_THREADS = os.cpu_count()
@@ -353,7 +354,13 @@ class Canvas:
         data = np.load(load_path, allow_pickle=True)
         self.canvas_pixels = data["inputs"]
         print(f"Loaded: {load_path}")
-        print(f"Evaluation for this piece is {data['outputs']}")
+        if len(data['outputs']) != 3:
+
+            print(f"Evaluation for this piece is {data['outputs']}")
+            print(f"Since this is not using the new evaluation system please re-save this")
+            print("If you want to over write please jud save it as the same name")
+        else:
+            print(f"Color, Form, Acceptability: {data['outputs']}")
         try:
             print(f"Comment is {data['comment']}")
         except:
@@ -665,21 +672,30 @@ if __name__ == "__main__":
                     # code for getting the eval
                     while True:
                         try:
-                            color_evaluation = float(input("Evaluation of color:"))
+                            color_evaluation = float(input("Evaluation of color (-1 to 1):"))
                             if -1 <= color_evaluation <= 1:
                                 break
                             else:
-                                print("Evaluations can only be between -1 and 1")
+                                print("Evaluations can only be from -1 to 1")
                         except:
                             print("BRu U gave some letters ")
 
                     while True:
                         try:
-                            form_evaluation = float(input("Evaluation of form:"))
+                            form_evaluation = float(input("Evaluation of form (-1 to 1):"))
                             if -1 <= form_evaluation <= 1:
                                 break
                             else:
-                                print("Evaluations can only be between -1 and 1")
+                                print("Evaluations can only be from -1 to 1")
+                        except:
+                            print("BRu U gave some letters ")
+                    while True:
+                        try:
+                            acceptability = float(input("Is art acceptable (0 or 1), keep this at 1, this is for filtering inappropriate stuff:"))
+                            if 0 == acceptability or 1 == acceptability:
+                                break
+                            else:
+                                print("Acceptability can only be 0 or 1, try again")
                         except:
                             print("BRu U gave some letters ")
                     # code for getting the comment on the art
@@ -689,7 +705,8 @@ if __name__ == "__main__":
                             break
                         else:
                             print("Please do not give '' as the comment")
-                    canvas.Save(save_path, name, np.array([color_evaluation, form_evaluation]), comment=np.array(comment, dtype=object))
+                    canvas.Save(save_path, name, np.array([color_evaluation, form_evaluation, acceptability]),
+                                comment=np.array(comment, dtype=object))
                 elif keys[pygame.K_LCTRL] and keys[pygame.K_l]:
                     while True:
                         name = input("Load file name:")
