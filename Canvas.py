@@ -622,6 +622,7 @@ class Canvas:
 
 if __name__ == "__main__":
     os.environ["SDL_VIDEO_CENTERED"] = "1"
+    # import ctypes
     # ctypes.windll.user32.SetProcessDPIAware()
     # true_res = (ctypes.windll.user32.GetSystemMetrics(0), ctypes.windll.user32.GetSystemMetrics(1) - 50)
     screen = pygame.display.set_mode((0, 0),
@@ -691,25 +692,6 @@ if __name__ == "__main__":
                             print("Name not found in paintings")
                     canvas.Load(f"Paintings/{name}.npz")
                     print()
-
-                if keys[pygame.K_x] and keys[pygame.K_LCTRL]:
-                    while True:
-                        try:
-                            option = int(input("1, 2, 3, for deleting all, Buffer state, Palette state"))
-                            break
-                        except:
-                            print("Please try again with the given options")
-                    if option == 1:
-                        if os.path.isfile(f"{saved_folder_path}/Buffer.npz"):
-                            os.remove(f"{saved_folder_path}/Buffer.npz")
-                        if os.path.isfile(f"{saved_folder_path}/Palette.npz"):
-                            os.remove(f"{saved_folder_path}/Palette.npz")
-                    elif option == 2:
-                        if os.path.isfile(f"{saved_folder_path}/Buffer.npz"):
-                            os.remove(f"{saved_folder_path}/Buffer.npz")
-                    else:
-                        if os.path.isfile(f"{saved_folder_path}/Palette.npz"):
-                            os.remove(f"{saved_folder_path}/Palette.npz")
 
             if event.type == pygame.QUIT:
                 canvas.Save_State()
