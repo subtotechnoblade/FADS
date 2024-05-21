@@ -176,7 +176,6 @@ class Color_Wheel:
             self.is_mouse_over_color_wheel = True
             for event in pygame_events:
                 if event.type == pygame.MOUSEBUTTONDOWN and mouse_pressed:
-                    print(True)
                     self.is_pressed = True
                     if keys[pygame.K_LSHIFT]:
                         self.color_pin[:2] = np.array([self.radius, self.radius], dtype=np.float32)

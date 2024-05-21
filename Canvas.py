@@ -19,7 +19,6 @@ from Palette import Palette
 from Linked_List import Linked_List
 from Filler import Color_Fill, Line_Fill
 
-
 scipy.fftpack = pyfftw.interfaces.scipy_fftpack
 set_global_backend(pyfftw.interfaces.scipy_fft)
 pyfftw.config.NUM_THREADS = os.cpu_count()
@@ -338,7 +337,7 @@ class Canvas:
         self.fill_threshold = 0
 
     def Save(self, save_path, name, evaluation, comment):
-        np.savez_compressed(f"{save_path}/{name}",
+        np.savez(f"{save_path}/{name}",
                             inputs=self.canvas_pixels,
                             outputs=evaluation,
                             comment=comment)
@@ -346,8 +345,7 @@ class Canvas:
     def Save_State(self, ):
         arr_buffer = self.buffer.To_Array()
         print(f"{self.saved_folder_path}/Buffer.npz")
-        np.savez_compressed(f"{self.saved_folder_path}/Buffer.npz", buffer=arr_buffer)
-        print("Passed")
+        np.savez(f"{self.saved_folder_path}/Buffer.npz", buffer=arr_buffer)
         self.palette.Save_Palette()
 
     def Load(self, load_path):
@@ -380,10 +378,10 @@ class Canvas:
         mask = np.ones((*mask.shape, 3), dtype=np.float32) * mask[:, :, np.newaxis]
         return np.around(self.canvas_pixels * (1 - mask) + (color * mask), decimals=5)
 
-    def Alpha_blend(self, color: np.array, mask: np.array):
-        # self.canvas_pixels = self.canvas_pixels * (1 - mask) + color * mask
-        mask = np.ones((*mask.shape, 3)) * mask[:, :, np.newaxis]
-        return np.around((self.canvas_pixels + (color * mask)) / (1 + mask), decimals=5)
+    # def Linear_Blend(self, color: np.array, mask: np.array):
+    #     # self.canvas_pixels = self.canvas_pixels * (1 - mask) + color * mask
+    #     mask = np.ones((*mask.shape, 3)) * mask[:, :, np.newaxis]
+    #     return np.around((self.canvas_pixels + (color * mask)) / (1 - mask), decimals=5)
 
     def Gamma_corrected_multiply(self, color: np.array, mask: np.array):
         painted_color = mask * color
@@ -439,7 +437,7 @@ class Canvas:
         mouse_x, mouse_y = mouse_pos
         mouse_pressed = pygame.mouse.get_pressed()
 
-        for event in pygame_events:
+        for event in self.pygame_events:
             if event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_down = True
 
@@ -487,7 +485,7 @@ class Canvas:
         if self.palette.is_selected_color_picker:
             return
 
-        self.brush.Update(keys, pygame_events, self.tile_size)
+        self.brush.Update(keys, self.pygame_events, self.tile_size)
         # update when we are not drawing nor selecting brush size/strength
         if ((self.pos[0] <= mouse_x <= self.pos[0] + self.pos[2] - self.tile_size and self.pos[1] <= mouse_y <=
              self.pos[1] + self.pos[3] - self.tile_size) and
@@ -648,9 +646,9 @@ if __name__ == "__main__":
     os.makedirs(save_path, exist_ok=True)
 
     canvas = Canvas(screen=screen,
-                    start_pos=(100, 400),
+                    start_pos=(200, 300),
                     shape=(120, 210),
-                    tile_size=6,
+                    tile_size=5,
                     brush_radius=20,
                     saved_folder_path=saved_folder_path,
                     falloff="linear")
@@ -668,7 +666,13 @@ if __name__ == "__main__":
         for event in pygame_events:
             if event.type == pygame.KEYDOWN:
                 if keys[pygame.K_LCTRL] and keys[pygame.K_s]:
-                    name = input("Name of file:")
+                    while True:
+                        name = input("Name of file:")
+                        if "/" in name or "\\" in name:
+                            print("BRU, I literally said not to put slashes in the file name on the doc")
+                        else:
+                            break
+
                     # code for getting the eval
                     while True:
                         try:
@@ -678,7 +682,7 @@ if __name__ == "__main__":
                             else:
                                 print("Evaluations can only be from -1 to 1")
                         except:
-                            print("BRu U gave some letters ")
+                            print("Bru U gave some letters ")
 
                     while True:
                         try:
@@ -688,10 +692,11 @@ if __name__ == "__main__":
                             else:
                                 print("Evaluations can only be from -1 to 1")
                         except:
-                            print("BRu U gave some letters ")
+                            print("Bru U gave some letters ")
                     while True:
                         try:
-                            acceptability = float(input("Is art acceptable (0 or 1), keep this at 1, this is for filtering inappropriate stuff:"))
+                            acceptability = float(input(
+                                "Is art acceptable (0 or 1), keep this at 1, this is for filtering inappropriate stuff:"))
                             if 0 == acceptability or 1 == acceptability:
                                 break
                             else:
@@ -720,7 +725,6 @@ if __name__ == "__main__":
             if event.type == pygame.QUIT:
                 canvas.Save_State()
                 running = False
-                # break
         pygame.display.flip()
     # sys.exit()
     pygame.quit()
