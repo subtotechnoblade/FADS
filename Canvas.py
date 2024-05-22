@@ -10,6 +10,7 @@ from numba import njit
 
 from splines import CatmullRom
 
+from PIL import Image
 import pyfftw
 import scipy.fftpack
 from scipy.fft import set_global_backend
@@ -336,13 +337,13 @@ class Canvas:
 
         self.fill_threshold = 0
 
-    def Save(self, save_path, name, evaluation, comment):
-        np.savez(f"{save_path}/{name}",
-                            inputs=self.canvas_pixels,
-                            outputs=evaluation,
-                            comment=comment)
+    def Save(self, save_path, evaluation, comment):
+        np.savez(f"{save_path}",
+                 inputs=self.canvas_pixels,
+                 outputs=evaluation,
+                 comment=comment)
 
-    def Save_State(self, ):
+    def Save_State(self):
         arr_buffer = self.buffer.To_Array()
         print(f"{self.saved_folder_path}/Buffer.npz")
         np.savez(f"{self.saved_folder_path}/Buffer.npz", buffer=arr_buffer)
@@ -367,9 +368,11 @@ class Canvas:
         self.buffer.Add(self.canvas_pixels)
         pygame.surfarray.blit_array(self.image,
                                     self.Scale_Image(self.canvas_pixels))
-    # def To_Image(self):
 
-
+    def Save_Image(self, file_path):
+        data = np.transpose(self.canvas_pixels, (1, 0, 2))
+        img = Image.fromarray(data.astype(np.uint8))
+        img.save(file_path)
 
     def Check_Brush_Collision(self):
         return self.brush.cursor.colliderect(self.pos)
@@ -648,6 +651,9 @@ if __name__ == "__main__":
     save_path = "Paintings"
     os.makedirs(save_path, exist_ok=True)
 
+    image_folder_path = "Images"
+    os.makedirs(image_folder_path, exist_ok=True)
+
     canvas = Canvas(screen=screen,
                     start_pos=(20, 300),
                     shape=(120, 210),
@@ -669,6 +675,7 @@ if __name__ == "__main__":
         keys = pygame.key.get_pressed()
         for event in pygame_events:
             if event.type == pygame.KEYDOWN:
+                # if we are trying to save
                 if keys[pygame.K_LCTRL] and keys[pygame.K_s]:
                     while True:
                         name = input("Name of file:")
@@ -714,8 +721,9 @@ if __name__ == "__main__":
                             break
                         else:
                             print("Please do not give '' as the comment")
-                    canvas.Save(save_path, name, np.array([color_evaluation, form_evaluation, acceptability]),
+                    canvas.Save(f"{save_path}/{name}", np.array([color_evaluation, form_evaluation, acceptability]),
                                 comment=np.array(comment, dtype=object))
+                # if trying to load
                 elif keys[pygame.K_LCTRL] and keys[pygame.K_l]:
                     while True:
                         name = input("Load file name:")
@@ -725,6 +733,16 @@ if __name__ == "__main__":
                             print("Name not found in paintings")
                     canvas.Load(f"Paintings/{name}.npz")
                     print()
+
+                elif keys[pygame.K_LCTRL] and keys[pygame.K_p]:
+                    while True:
+                        file_name = input("Name of file:")
+                        if "/" in file_name or "\\" in file_name:
+                            print("BRU, I literally said not to put slashes in the file name on the doc")
+                        else:
+                            break
+                    canvas.Save_Image(f"{image_folder_path}/{file_name}.png")
+                    print(f"Image saved at {image_folder_path}/{file_name}.png")
 
             if event.type == pygame.QUIT:
                 canvas.Save_State()
