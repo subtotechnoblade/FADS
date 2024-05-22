@@ -367,6 +367,9 @@ class Canvas:
         self.buffer.Add(self.canvas_pixels)
         pygame.surfarray.blit_array(self.image,
                                     self.Scale_Image(self.canvas_pixels))
+    # def To_Image(self):
+
+
 
     def Check_Brush_Collision(self):
         return self.brush.cursor.colliderect(self.pos)

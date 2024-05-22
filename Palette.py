@@ -467,6 +467,9 @@ class Palette:
     def Update(self, mouse_x, mouse_y, mouse_pressed, pygame_events: pygame.event, clickable=True):
         updated_pos = np.array([mouse_x, mouse_y])
         if (mouse_pressed[0]
+                # if we are colliding with the rectangle given my self.pos
+                and (self.pos[0] <= mouse_x <= self.pos[0] + self.pos[2] and self.pos[1] <= mouse_y <= self.pos[1] +
+                     self.pos[3])
                 # if we are not pressing the color wheel
                 and not self.color_wheel.is_pressed
                 # if the cursor is not in this box, (box difference)
@@ -535,6 +538,7 @@ class Palette:
 
     def Draw(self):
         self.screen.blit(self.background, self.pos[:2])
+        # self.background_rect = pygame.draw.rect(self.screen, color=(100, 100, 100), rect=self.pos.astype(np.int32))
 
         # draw cursor for selecting the color
         pygame.draw.rect(self.screen, color=(0, 134, 223), rect=self.selected_color_bucket.border)
