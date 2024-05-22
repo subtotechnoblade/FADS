@@ -646,7 +646,7 @@ if __name__ == "__main__":
     os.makedirs(save_path, exist_ok=True)
 
     canvas = Canvas(screen=screen,
-                    start_pos=(200, 300),
+                    start_pos=(20, 300),
                     shape=(120, 210),
                     tile_size=5,
                     brush_radius=20,
@@ -657,6 +657,7 @@ if __name__ == "__main__":
         clock.tick(60)
         pygame_events = pygame.event.get()
         screen.fill((153, 207, 224))
+        # screen.fill((0, 0, 0))
 
         canvas.Update(pygame_events)
 

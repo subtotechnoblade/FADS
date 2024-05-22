@@ -174,14 +174,13 @@ class Color_Wheel:
         self.is_mouse_over_color_wheel = False
         if (mouse_x - self.center[0]) ** 2 + (mouse_y - self.center[1]) ** 2 <= self.radius ** 2:
             self.is_mouse_over_color_wheel = True
-            for event in pygame_events:
-                if event.type == pygame.MOUSEBUTTONDOWN and mouse_pressed:
-                    self.is_pressed = True
-                    if keys[pygame.K_LSHIFT]:
-                        self.color_pin[:2] = np.array([self.radius, self.radius], dtype=np.float32)
-                        return
+            if mouse_pressed:
+                self.is_pressed = True
+                if keys[pygame.K_LSHIFT]:
+                    self.color_pin[:2] = np.array([self.radius, self.radius], dtype=np.float32)
+                    return
 
-                    self.color_pin[:2] = np.array([mouse_x - self.pos[0], mouse_y - self.pos[1]], dtype=np.float32)
+                self.color_pin[:2] = np.array([mouse_x - self.pos[0], mouse_y - self.pos[1]], dtype=np.float32)
             return
         if not mouse_pressed:
             self.is_pressed = False
@@ -194,17 +193,16 @@ class Color_Wheel:
         x, y = self.pos[0] + 160, self.pos[1]
         if x <= mouse_x <= x + 10 and y <= mouse_y <= y + 150:
             self.is_mouse_over_brightness_slider = True
-            for event in pygame_events:
-                if event.type == pygame.MOUSEBUTTONDOWN and mouse_pressed:
+            if mouse_pressed:
 
-                    if keys[pygame.K_LSHIFT]:
-                        self.color_pin[2] = 1.0
-                    else:
-                        self.color_pin[2] = 1.0 - (mouse_y - self.pos[1]) / 150
+                if keys[pygame.K_LSHIFT]:
+                    self.color_pin[2] = 1.0
+                else:
+                    self.color_pin[2] = 1.0 - (mouse_y - self.pos[1]) / 150
 
-                    self.Update_Color_Wheel()
-                    self.is_pressed = True
-                    return
+                self.Update_Color_Wheel()
+                self.is_pressed = True
+                return
         if not mouse_pressed:
             self.is_pressed = False
 
@@ -309,6 +307,8 @@ class Palette:
     def __init__(self, screen, starting_coord: np.array, saved_folder_path, button_size=75):
         self.screen = screen
         self.border_width = 15
+
+        self.background = pygame.image.load("Backgrounds/Palette_background.png").convert_alpha()
 
         self.pos = np.array([starting_coord[0],
                              starting_coord[1],
@@ -466,8 +466,7 @@ class Palette:
 
     def Update(self, mouse_x, mouse_y, mouse_pressed, pygame_events: pygame.event, clickable=True):
         updated_pos = np.array([mouse_x, mouse_y])
-
-        if (mouse_pressed[0] and self.background_rect.collidepoint(mouse_x, mouse_y)
+        if (mouse_pressed[0]
                 # if we are not pressing the color wheel
                 and not self.color_wheel.is_pressed
                 # if the cursor is not in this box, (box difference)
@@ -476,6 +475,7 @@ class Palette:
                           self.pos[1] + self.border_width <= mouse_y <= self.pos[1] + self.pos[
                               3] - 0.5 * self.border_width))):
             self.is_moving = True
+
         if not mouse_pressed[0]:
             self.is_moving = False
 
@@ -534,7 +534,7 @@ class Palette:
                         self.is_selected_color_picker = not self.is_selected_color_picker
 
     def Draw(self):
-        self.background_rect = pygame.draw.rect(self.screen, color=(100, 100, 100), rect=self.pos.astype(np.int32))
+        self.screen.blit(self.background, self.pos[:2])
 
         # draw cursor for selecting the color
         pygame.draw.rect(self.screen, color=(0, 134, 223), rect=self.selected_color_bucket.border)
@@ -565,7 +565,7 @@ if __name__ == "__main__":
                                      pygame.DOUBLEBUF | pygame.HWSURFACE | pygame.HWACCEL | pygame.RESIZABLE,
                                      vsync=1)
 
-    palette = Palette(screen, np.array([500, 400]))
+    palette = Palette(screen, np.array([500, 400]), None)
     mouse_coord = np.array(pygame.mouse.get_pos(), dtype=np.float32)
 
     clock = pygame.time.Clock()
