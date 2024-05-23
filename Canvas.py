@@ -326,7 +326,7 @@ class Canvas:
 
         self.mouse_curve = deque()
 
-        self.palette = Palette(self.screen, self.pos[:2] - np.array([0, 225]), self.saved_folder_path)
+        self.palette = Palette(self.screen, self.pos[:2] - np.array([0, -225]), self.saved_folder_path)
 
         self.brush = Brush(screen=self.screen, radius=brush_radius, palette=self.palette, falloff=falloff)
         self.transform = np.array([self.tile_size, self.tile_size], dtype=np.uint16)
@@ -488,10 +488,10 @@ class Canvas:
 
         # must be before brush update
         self.palette.Update(mouse_x, mouse_y, mouse_pressed, pygame_events)
-        if self.palette.is_selected_color_picker:
+        self.brush.Update(keys, self.pygame_events, self.tile_size)
+        if self.palette.is_selected_color_picker or self.palette.is_moving:
             return
 
-        self.brush.Update(keys, self.pygame_events, self.tile_size)
         # update when we are not drawing nor selecting brush size/strength
         if ((self.pos[0] <= mouse_x <= self.pos[0] + self.pos[2] - self.tile_size and self.pos[1] <= mouse_y <=
              self.pos[1] + self.pos[3] - self.tile_size) and
@@ -615,8 +615,8 @@ class Canvas:
         # Canvas drawing code
         self.screen.blit(self.image, self.pos[:2])
         # ui drawing code
-        self.palette.Draw()
 
+        self.palette.Draw()
         self.palette.Update_After_Render(self.pygame_events)  # Unconventional but must be used
 
         if not self.palette.is_selected_color_picker:
