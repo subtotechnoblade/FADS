@@ -6,7 +6,7 @@ import pygame
 import pygame.gfxdraw
 
 import numpy as np
-from numba import njit
+# from numba import njit
 
 from splines import CatmullRom
 
@@ -26,14 +26,14 @@ pyfftw.config.NUM_THREADS = os.cpu_count()
 pyfftw.interfaces.cache.enable()
 
 
-@njit(cache=True, nogil=True, fastmath=True)
+# @njit(cache=True, nogil=True, fastmath=True)
 def Compute_Circular_Mask(radius):
     size = 2 * radius + 1
     coords = np.arange(size, dtype=np.float32)
     return (coords - radius) ** 2 + (coords.reshape((-1, 1)) - radius) ** 2 <= radius ** 2
 
 
-@njit(cache=True, nogil=True, fastmath=True)
+# @njit(cache=True, nogil=True, fastmath=True)
 def Compute_Distance(radius):
     size = 2 * radius + 1
     coords = np.arange(size, dtype=np.float32)
@@ -90,7 +90,7 @@ class Brush:
         return distance
 
     @staticmethod
-    @njit(cache=True, nogil=True, fastmath=True)
+    # @njit(cache=True, nogil=True, fastmath=True)
     def Compute_Quadratic_Kernel(quadrant_length):
         if quadrant_length == 0:
             return np.ones((1, 1), dtype=np.float32)
@@ -102,7 +102,7 @@ class Brush:
         return kernel
 
     @staticmethod
-    @njit(cache=True, fastmath=True)
+    # @njit(cache=True, fastmath=True)
     def Compute_Cos_Kernel(quadrant_length):
         if quadrant_length == 0:
             return np.ones((1, 1), dtype=np.float32)
@@ -298,6 +298,7 @@ class Canvas:
         self.pos = np.array(
             [start_pos[0], start_pos[1], shape[1] * self.tile_size, shape[0] * self.tile_size],
             dtype=np.uint32)
+        self.pos[:2] += np.array([0, 180], dtype=np.uint32)
 
         self.drawn_curve = None
         self.image = pygame.Surface(self.pos[2:])
@@ -326,7 +327,7 @@ class Canvas:
 
         self.mouse_curve = deque()
 
-        self.palette = Palette(self.screen, self.pos[:2] - np.array([0, -225]), self.saved_folder_path)
+        self.palette = Palette(self.screen, self.pos[:2] + np.array([0, -180], dtype=np.int32), self.saved_folder_path)
 
         self.brush = Brush(screen=self.screen, radius=brush_radius, palette=self.palette, falloff=falloff)
         self.transform = np.array([self.tile_size, self.tile_size], dtype=np.uint16)
@@ -655,7 +656,7 @@ if __name__ == "__main__":
     os.makedirs(image_folder_path, exist_ok=True)
 
     canvas = Canvas(screen=screen,
-                    start_pos=(20, 300),
+                    start_pos=(50, 300),
                     shape=(120, 210),
                     tile_size=5,
                     brush_radius=20,
