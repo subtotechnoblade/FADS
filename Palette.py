@@ -308,7 +308,7 @@ class Palette:
         self.screen = screen
         self.border_width = 15
 
-        self.background = pygame.image.load("Backgrounds/Palette_background.png").convert_alpha()
+        self.background = pygame.image.load("Data/Backgrounds/Palette_background.png").convert_alpha()
 
         self.pos = np.array([starting_coord[0],
                              starting_coord[1],
@@ -370,10 +370,10 @@ class Palette:
         self.smoothing_buttons = []
 
         for i, (kernel_type, sprite_path) in enumerate(
-                [("constant", "icons/Constant_Icon.png"),
-                 ("linear", "icons/Linear_Icon.png"),
-                 ("quadratic", "icons/Quadratic_Icon.png"),
-                 ("cos", "icons/Cos_Icon.png")]):
+                [("constant", "Data/icons/Constant_Icon.png"),
+                 ("linear", "Data/icons/Linear_Icon.png"),
+                 ("quadratic", "Data/icons/Quadratic_Icon.png"),
+                 ("cos", "Data/icons/Cos_Icon.png")]):
             self.smoothing_buttons.append(
                 Misc_Selector(
                     np.array([starting_coord[0] + 175 + button_size + 6.5 * (button_size + self.border_width + 3),
@@ -394,8 +394,8 @@ class Palette:
                       starting_coord[1] + self.border_width,
                       30, 30], dtype=np.int16),
             screen=self.screen,
-            sprite_path="icons/Color_Picker_Icon.png",
-            info=pygame.transform.scale(pygame.image.load("icons/Color_Picker_Icon.png").convert_alpha(), (30, 30)))
+            sprite_path="Data/icons/Color_Picker_Icon.png",
+            info=pygame.transform.scale(pygame.image.load("Data/icons/Color_Picker_Icon.png").convert_alpha(), (30, 30)))
 
         self.is_moving = False
         self.prev_mouse_pos = np.array(pygame.mouse.get_pos(), dtype=np.int16)
@@ -532,7 +532,7 @@ class Palette:
                         old_color, old_pin = self.cached_color
                         self.selected_color_bucket.Set_RGB(old_color, old_pin)
                         self.color_wheel.Set_Color_Pin(old_pin)
-                        self.color_wheel.Update()
+                        self.color_wheel.Update(mouse_x, mouse_y, pygame_events)
                         self.is_selected_color_picker = not self.is_selected_color_picker
 
     def Draw(self):

@@ -20,6 +20,8 @@ from Palette import Palette
 from Linked_List import Linked_List
 from Filler import Color_Fill, Line_Fill
 
+import matplotlib.pyplot as plt
+
 scipy.fftpack = pyfftw.interfaces.scipy_fftpack
 set_global_backend(pyfftw.interfaces.scipy_fft)
 pyfftw.config.NUM_THREADS = os.cpu_count()
@@ -641,7 +643,7 @@ if __name__ == "__main__":
     # pygame.event.set_allowed([pygame.QUIT, pygame.KEYDOWN, pygame.MOUSEBUTTONUP, pygame.MOUSEBUTTONDOWN])
 
     pygame.display.set_caption("Fine Arts Drawing Simulator")
-    pygame_icon = pygame.transform.scale(pygame.image.load("icons/FADS_icon.png").convert(), (32, 32))
+    pygame_icon = pygame.transform.scale(pygame.image.load("Data/icons/FADS_icon.png").convert(), (32, 32))
     pygame.display.set_icon(pygame_icon)
     clock = pygame.time.Clock()
     pygame.mouse.set_visible(False)
