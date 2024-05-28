@@ -20,7 +20,7 @@ from Palette import Palette
 from Linked_List import Linked_List
 from Filler import Color_Fill, Line_Fill
 
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 scipy.fftpack = pyfftw.interfaces.scipy_fftpack
 set_global_backend(pyfftw.interfaces.scipy_fft)
@@ -634,9 +634,10 @@ if __name__ == "__main__":
     os.environ["SDL_VIDEO_CENTERED"] = "1"
     import ctypes
 
+    pygame.init()
     ctypes.windll.user32.SetProcessDPIAware()
     true_res = (ctypes.windll.user32.GetSystemMetrics(0), ctypes.windll.user32.GetSystemMetrics(1) - 50)
-    screen = pygame.display.set_mode((0, 0),
+    screen = pygame.display.set_mode(true_res,
                                      pygame.DOUBLEBUF | pygame.HWSURFACE | pygame.HWACCEL | pygame.RESIZABLE,
                                      vsync=1)
 

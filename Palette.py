@@ -402,6 +402,9 @@ class Palette:
         self.background_rect = pygame.draw.rect(screen, color=(100, 100, 100),
                                                 rect=self.pos.astype(np.int32, copy=False))
 
+        pygame.mixer.music.load("Data/Music/SPECIALZ.mp3")
+        self.play_meme_song = False
+
     def Update_Pos(self, dx, dy):
         self.pos += np.array([dx, dy, 0, 0], dtype=np.int16)
         self.color_wheel.Update_Pos(dx, dy)
@@ -484,6 +487,12 @@ class Palette:
         if self.is_moving:
             dx, dy = updated_pos - self.prev_mouse_pos
             self.Update_Pos(dx, dy)
+
+            # check here if we have sent the thing into the void
+            if self.pos[0] <= -951 and not self.play_meme_song:
+                # play the funny song on loop
+                pygame.mixer.music.play(-1)
+                self.play_meme_song = True
         self.prev_mouse_pos = updated_pos
 
         if not self.is_moving and not self.is_selected_color_picker:
@@ -562,6 +571,7 @@ if __name__ == "__main__":
     import ctypes
 
     os.environ["SDL_VIDEO_CENTERED"] = "1"
+    pygame.init()
     ctypes.windll.user32.SetProcessDPIAware()
     true_res = (ctypes.windll.user32.GetSystemMetrics(0), ctypes.windll.user32.GetSystemMetrics(1) - 50)
     screen = pygame.display.set_mode(true_res,
