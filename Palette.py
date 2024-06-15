@@ -47,8 +47,7 @@ class Misc_Selector(Button):
     def __init__(self, pos, screen, sprite_path, info):
         super().__init__(pos, screen)
         image = pygame.image.load(sprite_path).convert_alpha()
-        self.sprite = pygame.transform.scale(image,
-                                             (self.pos[-1], self.pos[-1]))
+        self.sprite = pygame.transform.scale(image, self.pos[2:])
         self.info = info
 
     def Get_Info(self):
@@ -213,7 +212,7 @@ class Color_Wheel:
         self.Find_Closest_Color(self.color_wheel, np.array([255, 255, 0]))
 
     @staticmethod
-    # @njit(cache=True, nogil=True)
+    # @njit(cache=True, nogil=True, fastmath=True)
     def Find_Closest_Color(color_wheel, target_color):
         best_loss = np.inf
         best_position = (-1, -1)
@@ -370,10 +369,10 @@ class Palette:
         self.smoothing_buttons = []
 
         for i, (kernel_type, sprite_path) in enumerate(
-                [("constant", "Data/icons/Constant_Icon.png"),
-                 ("linear", "Data/icons/Linear_Icon.png"),
-                 ("quadratic", "Data/icons/Quadratic_Icon.png"),
-                 ("cos", "Data/icons/Cos_Icon.png")]):
+                [("constant", "Data/Icons/Constant_Icon.png"),
+                 ("linear", "Data/Icons/Linear_Icon.png"),
+                 ("quadratic", "Data/Icons/Quadratic_Icon.png"),
+                 ("cos", "Data/Icons/Cos_Icon.png")]):
             self.smoothing_buttons.append(
                 Misc_Selector(
                     np.array([starting_coord[0] + 175 + button_size + 6.5 * (button_size + self.border_width + 3),
@@ -394,15 +393,15 @@ class Palette:
                       starting_coord[1] + self.border_width,
                       30, 30], dtype=np.int16),
             screen=self.screen,
-            sprite_path="Data/icons/Color_Picker_Icon.png",
-            info=pygame.transform.scale(pygame.image.load("Data/icons/Color_Picker_Icon.png").convert_alpha(), (30, 30)))
+            sprite_path="Data/Icons/Color_Picker_Icon.png",
+            info=pygame.transform.scale(pygame.image.load("Data/Icons/Color_Picker_Icon.png").convert_alpha(), (30, 30)))
 
         self.is_moving = False
         self.prev_mouse_pos = np.array(pygame.mouse.get_pos(), dtype=np.int16)
         self.background_rect = pygame.draw.rect(screen, color=(100, 100, 100),
                                                 rect=self.pos.astype(np.int32, copy=False))
 
-        pygame.mixer.music.load("Data/Music/SPECIALZ.mp3")
+        pygame.mixer.music.load("Data/Music/FADSpecialZ.mp3")
         self.play_meme_song = False
 
     def Update_Pos(self, dx, dy):

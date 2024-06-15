@@ -1,19 +1,21 @@
 import os
 # import sys
+import time
 from collections import deque
 
 import pygame
 import pygame.gfxdraw
 
 import numpy as np
+from glob import glob
 # from numba import njit
 
 from splines import CatmullRom
 
 from PIL import Image
-import pyfftw
-import scipy.fftpack
-from scipy.fft import set_global_backend
+# import pyfftw
+# import scipy.fftpack
+# from scipy.fft import set_global_backend
 from scipy.signal import fftconvolve
 
 from Palette import Palette
@@ -22,10 +24,10 @@ from Filler import Color_Fill, Line_Fill
 
 # import matplotlib.pyplot as plt
 
-scipy.fftpack = pyfftw.interfaces.scipy_fftpack
-set_global_backend(pyfftw.interfaces.scipy_fft)
-pyfftw.config.NUM_THREADS = os.cpu_count()
-pyfftw.interfaces.cache.enable()
+# scipy.fftpack = pyfftw.interfaces.scipy_fftpack
+# set_global_backend(pyfftw.interfaces.scipy_fft)
+# pyfftw.config.NUM_THREADS = os.cpu_count()
+# pyfftw.interfaces.cache.enable()
 
 
 # @njit(cache=True, nogil=True, fastmath=True)
@@ -43,7 +45,7 @@ def Compute_Distance(radius):
 
 
 class Brush:
-    def __init__(self, screen, radius, palette, falloff):
+    def __init__(self, screen, radius, palette):
         pygame.font.init()
 
         self.screen = screen
@@ -52,7 +54,6 @@ class Brush:
         self.new_radius = radius
         self.palette = palette
 
-        self.Numba_Warmup()
         self.strength = 1.0
         self.new_strength = self.strength
         self.strength_font = pygame.font.SysFont("ebrima", 25)
@@ -73,30 +74,30 @@ class Brush:
         self.kernel *= self.strength
         self.visual_kernel = None
 
-    def Numba_Warmup(self):
-        self.Compute_Constant_Kernel(self.radius)
-        self.Compute_Linear_Kernel(self.radius)
-        self.Compute_Quadratic_Kernel(self.radius)
-        self.Compute_Cos_Kernel(self.radius)
+    @classmethod
+    def Numba_Warmup(cls, radius):
+        Compute_Distance(radius)
+        Compute_Circular_Mask(radius)
+        cls.Compute_Constant_Kernel(radius - 1)
+        cls.Compute_Linear_Kernel(radius)
+        cls.Compute_Quadratic_Kernel(radius - 1)
+        cls.Compute_Cos_Kernel(radius) - 1
 
     @staticmethod
-    def Compute_Constant_Kernel(quadrant_length):
-        if quadrant_length == 0:
-            return np.ones((1, 1), dtype=np.float32)
-        return Compute_Circular_Mask(quadrant_length).astype(np.float32, copy=False) * 1
-
-    @staticmethod
+    # @njit(cache=True, nogil=True, fastmath=True)
     def Compute_Linear_Kernel(quadrant_length):
         distance = 1 - (Compute_Distance(quadrant_length) / quadrant_length)
         distance *= Compute_Circular_Mask(quadrant_length)
         return distance
 
     @staticmethod
+    #     @njit(cache=True, nogil=True, fastmath=True)
+    def Compute_Constant_Kernel(quadrant_length):
+        return Compute_Circular_Mask(quadrant_length)
+
+    @staticmethod
     # @njit(cache=True, nogil=True, fastmath=True)
     def Compute_Quadratic_Kernel(quadrant_length):
-        if quadrant_length == 0:
-            return np.ones((1, 1), dtype=np.float32)
-
         distance_mask = Compute_Distance(quadrant_length) / quadrant_length
 
         kernel = ((-distance_mask ** 2) + 1)
@@ -104,14 +105,11 @@ class Brush:
         return kernel
 
     @staticmethod
-    # @njit(cache=True, fastmath=True)
+    #     @njit(cache=True, fastmath=True)
     def Compute_Cos_Kernel(quadrant_length):
-        if quadrant_length == 0:
-            return np.ones((1, 1), dtype=np.float32)
-
         distance_mask = Compute_Distance(quadrant_length) / quadrant_length
         # print
-        kernel = (0.5 * np.cos(np.pi * distance_mask) + 0.5).astype(np.float32)
+        kernel = (0.5 * np.cos(np.pi * distance_mask) + 0.5)
         kernel /= kernel[quadrant_length][quadrant_length]
         kernel *= Compute_Circular_Mask(quadrant_length)  # Mask out the necessary pixels to 0
 
@@ -130,7 +128,7 @@ class Brush:
             return self.Compute_Quadratic_Kernel(quadrant_length)
 
         if "constant" == self.palette.Get_Kernel_Type():
-            return self.Compute_Constant_Kernel(quadrant_length * 0.8)
+            return self.Compute_Constant_Kernel(int(quadrant_length * 0.8))
 
     def Get_Kernel(self):
         return self.kernel
@@ -175,7 +173,7 @@ class Brush:
                 if keys[pygame.K_LSHIFT]:
                     scaling = 0.25
                 self.new_radius += int(dx * scaling)
-                self.new_radius = self.new_radius if self.new_radius >= 1 else 1
+                self.new_radius = max(1, min(self.new_radius, 350))
 
                 if confirm:
                     self.radius = self.new_radius
@@ -197,7 +195,7 @@ class Brush:
                 if keys[pygame.K_LSHIFT]:
                     scaling = 0.25
                 self.new_strength += (dx / 200) * scaling
-                self.new_strength = np.clip(self.new_strength, 0, 1)
+                self.new_strength = max(0.0, min(self.new_strength, 1.0))
                 # implement strength control code here
 
                 if confirm:
@@ -292,8 +290,12 @@ class Brush:
 
 
 class Canvas:
-    def __init__(self, screen, start_pos, shape, tile_size=5, brush_radius=10, saved_folder_path="", load_path="",
-                 falloff="linear"):
+    def __init__(self, screen,
+                 start_pos, shape,
+                 tile_size=5,
+                 brush_radius=10,
+                 saved_folder_path="",
+                 pipe_connection=None):
         self.screen = screen
         self.shape = shape
         self.tile_size = tile_size
@@ -331,7 +333,7 @@ class Canvas:
 
         self.palette = Palette(self.screen, self.pos[:2] + np.array([0, -180], dtype=np.int32), self.saved_folder_path)
 
-        self.brush = Brush(screen=self.screen, radius=brush_radius, palette=self.palette, falloff=falloff)
+        self.brush = Brush(screen=self.screen, radius=brush_radius, palette=self.palette)
         self.transform = np.array([self.tile_size, self.tile_size], dtype=np.uint16)
         self.mask = None
 
@@ -340,11 +342,26 @@ class Canvas:
 
         self.fill_threshold = 0
 
-    def Save(self, save_path, evaluation, comment):
+        self.comment_font = pygame.font.Font(None, 40)
+        self.comment_start_time = 0
+        self.show_comment = False
+        self.comment_surfs = []
+
+        self.pipe_connection = pipe_connection
+        self.generating_text = False
+
+    def Set_Screen(self, screen):
+        self.screen = screen
+        self.brush.screen = screen
+
+    def Save_Train(self, save_path, evaluation, comment):
         np.savez(f"{save_path}",
                  inputs=self.canvas_pixels,
                  outputs=evaluation,
                  comment=comment)
+
+    def Save(self, save_path):
+        np.savez(f"{save_path}", inputs=self.canvas_pixels)
 
     def Save_State(self):
         arr_buffer = self.buffer.To_Array()
@@ -372,8 +389,15 @@ class Canvas:
         pygame.surfarray.blit_array(self.image,
                                     self.Scale_Image(self.canvas_pixels))
 
+    def Load_Internal(self, image_path):
+        data = np.load(image_path, allow_pickle=True)
+        self.canvas_pixels = data["inputs"]
+        self.buffer.Add(self.canvas_pixels)
+        pygame.surfarray.blit_array(self.image,
+                                    self.Scale_Image(self.canvas_pixels))
+
     def Save_Image(self, file_path):
-        data = np.transpose(self.canvas_pixels, (1, 0, 2))
+        data = self.Scale_Image(np.transpose(self.canvas_pixels, (1, 0, 2)))
         img = Image.fromarray(data.astype(np.uint8))
         img.save(file_path)
 
@@ -386,21 +410,6 @@ class Canvas:
     def Linear_Blend(self, color: np.array, mask: np.array):
         mask = np.ones((*mask.shape, 3), dtype=np.float32) * mask[:, :, np.newaxis]
         return np.around(self.canvas_pixels * (1 - mask) + (color * mask), decimals=5)
-
-    # def Linear_Blend(self, color: np.array, mask: np.array):
-    #     # self.canvas_pixels = self.canvas_pixels * (1 - mask) + color * mask
-    #     mask = np.ones((*mask.shape, 3)) * mask[:, :, np.newaxis]
-    #     return np.around((self.canvas_pixels + (color * mask)) / (1 - mask), decimals=5)
-
-    def Gamma_corrected_multiply(self, color: np.array, mask: np.array):
-        painted_color = mask * color
-
-        linear_canvas = ((self.canvas_pixels / 255) ** 2.2) * 255
-        linear_color = ((painted_color / 255) ** 0.5) * 255
-
-        linear_result = (((1 - mask) * self.canvas_pixels) + (mask * linear_color))
-        result = linear_result.clip(0, 255)
-        self.canvas_pixels = result
 
     def CatMull_Rom_interpolation(self, mouse_curve, tile_size, fully=False) -> np.array:
         # assert len(mouse_curve) == 4
@@ -436,14 +445,72 @@ class Canvas:
 
         return mask
 
-    def Update(self, pygame_events):
-        self.pygame_events = pygame_events
-        is_brush_collided = self.Check_Brush_Collision()
+    def Set_Comment(self, input_text, max_words_in_line=5):
+        if not self.show_comment:
+            split_text = input_text.split(" ")
+
+            combined_text = ""
+            for i, text in enumerate(split_text):
+                combined_text += text + " "
+                if (i + 1) % max_words_in_line == 0 and i != 0:
+                    self.comment_surfs.append(self.comment_font.render(combined_text, 1, (255, 255, 255)))
+                    combined_text = ""
+            else:  # first time in this program using for and else
+                self.comment_surfs.append(self.comment_font.render(combined_text, 1, (255, 255, 255)))
+            self.show_comment = True
+            self.comment_start_time = time.time()
+
+    def Render_Comment(self, pos):
+        if self.show_comment:
+            for i, comment_surf in enumerate(self.comment_surfs):
+                self.screen.blit(comment_surf, (pos[0], pos[1] + i * 20))
+
+    def Submit(self) -> (bool, str):
+        return
+        file_name = len(glob("Images/*.png"))
+        self.Save_Image(f"Images/{file_name}.png")
+        self.Save(f"Paintings/{file_name}.npz")
+        time.sleep(0.1)
+        self.pipe_connection.send(f"Paintings/{file_name}.npz".encode())
+        self.generating_text = True
+
+    def Get_Comment(self):
+        if os.path.exists("Data/tmp/signal.txt"):
+            os.remove("Data/tmp/signal.txt")
+            print("Recieved comment")
+            return self.pipe_connection.recv().decode()
+
+    def Update(self, mouse_x, mouse_y, pygame_events):
         keys = pygame.key.get_pressed()
-        # mouse_pos
+        self.pygame_events = pygame_events
+        # if self.generating_text or self.show_comment:
+        #     self.brush.mouse_pos = np.array(pygame.mouse.get_pos())
+        #     model_output = self.Get_Comment()
+        #     if model_output is not None:
+        #         model_output = model_output.decode()
+        #         print(model_output)
+        #         comment, evaluation = model_output.split("|")
+        #         color, form, _ = evaluation.split(",")
+        #         color, form = float(color), float(form)
+        #         comment += f"I give you a {color * 0.75 + form * 0.25}!"
+        #         self.Set_Comment(comment)
+        #         self.generating_text = False
+        #
+        # for event in pygame_events:
+        #     if event == pygame.KEYDOWN and keys[pygame.K_RETURN]:
+        #         self.show_comment = False
+        #         self.comment_surfs = []
+        #         self.comment_start_time = None
+        #
+        #         self.buffer = Linked_List()
+        #         self.canvas_pixels = np.ones((*self.shape[::-1], 3), dtype=np.float32) * 255
+        #         self.buffer.Add(np.array(self.canvas_pixels))
+        #
+
+            # return "Canvas"  # prevent any bug from occuring if you contiue to draw
+        is_brush_collided = self.Check_Brush_Collision()
+
         mouse_down = False
-        mouse_pos = pygame.mouse.get_pos()
-        mouse_x, mouse_y = mouse_pos
         mouse_pressed = pygame.mouse.get_pressed()
 
         for event in self.pygame_events:
@@ -485,6 +552,16 @@ class Canvas:
                     if keys[pygame.K_LCTRL] or keys[pygame.K_RCTRL]:
                         self.buffer.Add(np.array(self.canvas_pixels))
 
+                if keys[pygame.K_RETURN] or keys[pygame.K_SPACE]:
+                    if not np.allclose(self.canvas_pixels, np.ones((210, 120, 3)) * 255):
+                        file_name = len(glob("Images/*.png"))
+                        self.Save(f"Paintings/{file_name}.npz")
+                        self.Save_Image(f"Images/{file_name}.png")
+
+                        self.buffer = Linked_List()
+                        self.canvas_pixels = np.ones((*self.shape[::-1], 3), dtype=np.float32) * 255
+                        self.buffer.Add(np.array(self.canvas_pixels))
+
             if event.type == pygame.KEYUP:
                 pygame.surfarray.blit_array(self.image,
                                             self.Scale_Image(self.canvas_pixels))
@@ -493,7 +570,7 @@ class Canvas:
         self.palette.Update(mouse_x, mouse_y, mouse_pressed, pygame_events)
         self.brush.Update(keys, self.pygame_events, self.tile_size)
         if self.palette.is_selected_color_picker or self.palette.is_moving:
-            return
+            return "Canvas"
 
         # update when we are not drawing nor selecting brush size/strength
         if ((self.pos[0] <= mouse_x <= self.pos[0] + self.pos[2] - self.tile_size and self.pos[1] <= mouse_y <=
@@ -562,11 +639,6 @@ class Canvas:
                     self.drawn_curve[int((x - self.pos[0]) / self.tile_size)][
                         int((y - self.pos[1]) / self.tile_size)] = 1
 
-                # print(True)
-            # Todo implement a way to get the current blending type
-            # mask = self.Get_Mask(mouse_coords=interpolated_mouse_coords)
-            # self.Alpha_blend(self.palette.Get_color(), mask)
-            # self.Linear_blend(self.palette.Get_color(), mask)
             if self.palette.Get_Kernel_Type() != "constant":
                 self.mask = self.Compute_Convolved_Mask(self.brush.Get_Kernel())
             else:
@@ -614,6 +686,9 @@ class Canvas:
             self.mouse_curve = deque()
             self.clamp = 0
 
+        # return the current state, also implenent the return back button here
+        return "Canvas"
+
     def Draw(self):
         # Canvas drawing code
         self.screen.blit(self.image, self.pos[:2])
@@ -628,6 +703,10 @@ class Canvas:
             mouse_x, mouse_y = pygame.mouse.get_pos()
 
             self.screen.blit(self.palette.color_picker.info, (mouse_x, mouse_y - 30))
+
+        # comment_screen = self.comment_font.render(self.comment, 1, (0, 0, 0))
+        # self.screen.blit(comment_screen, (500, 500))
+        self.Render_Comment((1500, 200))
 
 
 if __name__ == "__main__":
@@ -644,7 +723,7 @@ if __name__ == "__main__":
     # pygame.event.set_allowed([pygame.QUIT, pygame.KEYDOWN, pygame.MOUSEBUTTONUP, pygame.MOUSEBUTTONDOWN])
 
     pygame.display.set_caption("Fine Arts Drawing Simulator")
-    pygame_icon = pygame.transform.scale(pygame.image.load("Data/icons/FADS_icon.png").convert(), (32, 32))
+    pygame_icon = pygame.transform.scale(pygame.image.load("Data/Icons/FADS_icon.png").convert(), (32, 32))
     pygame.display.set_icon(pygame_icon)
     clock = pygame.time.Clock()
     pygame.mouse.set_visible(False)
@@ -652,7 +731,8 @@ if __name__ == "__main__":
     saved_folder_path = "Save"
     os.makedirs(saved_folder_path, exist_ok=True)
 
-    save_path = "Paintings"
+    into = "/"
+    save_path = f"Paintings{into}"
     os.makedirs(save_path, exist_ok=True)
 
     image_folder_path = "Images"
@@ -661,18 +741,19 @@ if __name__ == "__main__":
     canvas = Canvas(screen=screen,
                     start_pos=(50, 300),
                     shape=(120, 210),
+                    # shape=(100, 300),
                     tile_size=5,
                     brush_radius=20,
-                    saved_folder_path=saved_folder_path,
-                    falloff="linear")
+                    saved_folder_path=saved_folder_path)
     running = True
     while running:
         clock.tick(60)
         pygame_events = pygame.event.get()
         screen.fill((153, 207, 224))
         # screen.fill((0, 0, 0))
-
-        canvas.Update(pygame_events)
+        mouse_x, mouse_y = pygame.mouse.get_pos()
+        canvas.Update(mouse_x, mouse_y, pygame_events)
+        canvas.Set_Comment("Thisfsgfaegsfg fdgfa esdgf  fs f eads wefs fgfdhrg")
 
         canvas.Draw()
 
@@ -725,17 +806,18 @@ if __name__ == "__main__":
                             break
                         else:
                             print("Please do not give '' as the comment")
-                    canvas.Save(f"{save_path}/{name}", np.array([color_evaluation, form_evaluation, acceptability]),
-                                comment=np.array(comment, dtype=object))
+                    canvas.Save_Train(f"{save_path}/{name}",
+                                      np.array([color_evaluation, form_evaluation, acceptability]),
+                                      comment=np.array(comment, dtype=object))
                 # if trying to load
                 elif keys[pygame.K_LCTRL] and keys[pygame.K_l]:
                     while True:
                         name = input("Load file name:")
-                        if os.path.exists(f"Paintings/{name}.npz"):
+                        if os.path.exists(f"Paintings{into}{name}.npz"):
                             break
                         else:
                             print("Name not found in paintings")
-                    canvas.Load(f"Paintings/{name}.npz")
+                    canvas.Load(f"Paintings/{into}{name}.npz")
                     print()
 
                 elif keys[pygame.K_LCTRL] and keys[pygame.K_p]:

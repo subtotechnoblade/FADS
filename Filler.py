@@ -39,20 +39,3 @@ def Line_Fill(input_array, start_coords, threshold=0):
 
     return labeled_array == feature_index
 
-
-if __name__ == "__main__":
-    import time
-
-    arr = np.zeros((10, 10, 3))
-
-    length = 5
-    for i in range(length):
-        arr[i][0] = 1
-        arr[length - 1][i] = 1
-        arr[i][length] = 1
-    s = time.time()
-    for _ in range(1):
-        x = Line_Fill(arr, (0, 0), np.array([2, 2, 2]))
-    print(time.time() - s)
-    print(np.sum(x, axis=-1))
-
